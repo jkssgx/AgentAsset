@@ -664,7 +664,123 @@ sequenceDiagram
   A->>AG: record_usage(skill_asset_id, version, task_id)
 ```
 
-## 9. 后续需要细化的问题
+## 9. 技术选型建议
+
+### 9.1 DeepAgents 支持 Python
+
+当前选型准备基于 `langchain-ai/deepagents`。根据 DeepAgents Python 文档，Python 版本支持以下核心能力：
+
+- `create_deep_agent` 创建 Agent。
+- 工具调用。
+- 文件系统上下文。
+- 子 Agent。
+- memory。
+- human-in-the-loop。
+- skills。
+
+其中 Skills 机制也支持 Python 路径：
+
+```text
+Skill 目录
+  -> SKILL.md
+  -> scripts/
+  -> references/
+  -> templates / assets
+```
+
+Agent 启动时读取 `SKILL.md` frontmatter，根据名称和描述判断是否相关；任务匹配后，再渐进式读取完整 `SKILL.md`、脚本、参考文件和模板。
+
+因此，首期 DeepAgents Runtime、Agent Asset Adapter 和 Skill Projection Service 都可以优先采用 Python 实现。
+
+### 9.2 首期推荐技术栈
+
+首期目标是尽快验证以下闭环：
+
+```text
+资产定义
+  -> Skill 投影
+  -> Agent 调用资产
+  -> 治理校验
+  -> 使用记录
+  -> 候选资产沉淀
+```
+
+推荐首期技术栈：
+
+```text
+后端服务：Python FastAPI
+Agent Runtime：Python DeepAgents
+Agent Asset Adapter：Python
+Skill Projection Service：Python 模块
+数据库：PostgreSQL + pgvector
+缓存 / 轻量队列：Redis
+文件与附件存储：MinIO 或 S3 兼容对象存储
+接口协议：OpenAPI / HTTP JSON
+```
+
+这种方案的优点：
+
+- 语言栈统一，开发效率高。
+- 更贴近 DeepAgents Python 文档和生态。
+- Skill 投影、脚本执行、资产检索、Agent 编排都可以在 Python 内快速打通。
+- 适合早期验证资产协议和业务闭环。
+
+首期仍需保持清晰边界：
+
+```text
+Asset Management Service
+  -> Asset Gateway
+  -> Agent Asset Adapter
+  -> Python DeepAgents Runtime
+```
+
+也就是说，即使语言统一，也不能把资产管理逻辑直接写死在 Agent Runtime 内。
+
+### 9.3 长期演进选项
+
+如果后续资产管理模块变成企业级治理系统，并且需要重度处理以下能力：
+
+- 复杂权限。
+- 审批流。
+- 版本治理。
+- 审计合规。
+- 多系统集成。
+- 多 Agent 共用资产。
+- 高并发资产检索和工具治理。
+
+则可以考虑将资产管理核心服务演进为：
+
+```text
+Java 21 / Kotlin + Spring Boot
+```
+
+同时保留：
+
+```text
+Agent Runtime：Python DeepAgents
+Skill Projection Service：Python
+Asset Gateway：OpenAPI / HTTP JSON / 后续可扩展 MCP
+```
+
+这种长期形态可以理解为：
+
+```text
+资产管理服务按企业级工业系统建设。
+Agent Runtime 按 DeepAgents Python 生态建设。
+二者通过稳定 Asset Gateway 协议解耦。
+```
+
+### 9.4 当前建议
+
+当前阶段更推荐：
+
+```text
+Python FastAPI + Python DeepAgents + PostgreSQL + pgvector
+```
+
+但架构上保留独立服务边界和 Asset Gateway 协议边界。这样既能快速形成 MVP，又不会阻塞后续将资产管理核心迁移或拆分为更重的企业级服务。
+
+## 10. 后续需要细化的问题
 
 - 资产对象模型字段和不同资产类型的专属字段。
 - Agent 身份、权限和任务上下文模型。
@@ -675,3 +791,4 @@ sequenceDiagram
 - 资产价值度量指标和任务结果回传口径。
 - 首期工程部署形态：单体模块化部署，还是 Agent Runtime 与 Asset Management 分服务部署。
 - 业务 Skill 资产的字段模型、投影规则、版本同步策略和运行时缓存策略。
+- 首期是否统一采用 Python FastAPI + Python DeepAgents，长期是否保留 Java/Kotlin 资产治理服务演进路径。

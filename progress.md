@@ -17,13 +17,15 @@
 - 沉淀业务 Skill 资产与 Agent Skills 机制的关系：资产管理服务作为 Source of Truth，Agent Skills 目录或后端作为 Runtime Projection，Agent Runtime 作为 Consumer。
 - 明确资产服务不替代 Skills 的渐进式披露机制，而是负责业务 Skill 的治理、版本、权限、审批、审计和价值度量。
 - 初步定义 Skill Projection Service：将正式发布且当前 Agent 有权使用的业务 Skill 资产投影为 `SKILL.md`、`references/`、`scripts/` 等运行时文件结构。
+- 修正 DeepAgents 技术判断：DeepAgents Python 支持 Agent、tools、filesystem、subagents、memory、human-in-the-loop 和 skills，首期 Agent Runtime、Agent Asset Adapter 与 Skill Projection Service 可优先采用 Python。
+- 初步沉淀首期技术栈建议：Python FastAPI + Python DeepAgents + PostgreSQL + pgvector，长期保留 Java/Kotlin + Spring Boot 作为企业级资产治理服务的演进选项。
 
 ## 后续规划
 
 - 根据评审反馈确定主视觉方向、信息密度和页面结构。
 - 继续补齐候选资产沉淀、验证审批、Agent 引用链、治理配置等关键页面。
 - 将确认后的产品需求沉淀到 `PRD.md`。
-- 继续细化 `architecture.md` 中的资产对象模型、业务 Skill 资产模型、Agent 任务上下文模型、权限模型、候选资产验证机制和 DeepAgents 适配实现。
+- 继续细化 `architecture.md` 中的资产对象模型、业务 Skill 资产模型、Agent 任务上下文模型、权限模型、候选资产验证机制、DeepAgents 适配实现和首期技术栈边界。
 
 ## 遗留问题
 
@@ -36,3 +38,4 @@
 - 需要确认哪些资产类型可以发布为业务 Skill，哪些只作为 Skill 运行时引用的支撑资产。
 - 需要确认 Skill Projection Service 的实现方式：任务开始时动态投影、Agent 启动时预投影，还是按版本变更增量同步。
 - 需要确认 Skill Bundle 中脚本的安全沙箱、权限边界和审计要求。
+- 需要确认首期是否统一采用 Python FastAPI + Python DeepAgents，还是资产管理核心服务一开始就采用 Java/Kotlin 与 Agent Runtime 分离。
