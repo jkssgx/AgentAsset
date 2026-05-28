@@ -14,13 +14,16 @@
 - 初步定义 Agent 自主沉淀资产的边界：Agent 可以提交候选资产，但不能直接修改正式资产库。
 - 初步抽象 6 个核心接口：`search_assets`、`get_asset`、`resolve_context`、`check_policy`、`record_usage`、`propose_candidate`。
 - 明确资产管理模块与 Agent Runtime 的服务边界：领域职责独立，长期可拆为两个独立服务，首期可采用“逻辑独立、部署可合并”的模块化落地方式。
+- 沉淀业务 Skill 资产与 Agent Skills 机制的关系：资产管理服务作为 Source of Truth，Agent Skills 目录或后端作为 Runtime Projection，Agent Runtime 作为 Consumer。
+- 明确资产服务不替代 Skills 的渐进式披露机制，而是负责业务 Skill 的治理、版本、权限、审批、审计和价值度量。
+- 初步定义 Skill Projection Service：将正式发布且当前 Agent 有权使用的业务 Skill 资产投影为 `SKILL.md`、`references/`、`scripts/` 等运行时文件结构。
 
 ## 后续规划
 
 - 根据评审反馈确定主视觉方向、信息密度和页面结构。
 - 继续补齐候选资产沉淀、验证审批、Agent 引用链、治理配置等关键页面。
 - 将确认后的产品需求沉淀到 `PRD.md`。
-- 继续细化 `architecture.md` 中的资产对象模型、Agent 任务上下文模型、权限模型、候选资产验证机制和 DeepAgents 适配实现。
+- 继续细化 `architecture.md` 中的资产对象模型、业务 Skill 资产模型、Agent 任务上下文模型、权限模型、候选资产验证机制和 DeepAgents 适配实现。
 
 ## 遗留问题
 
@@ -30,3 +33,6 @@
 - 需要确认 DeepAgents 首期接入形态：工具调用为主，还是同时使用文件系统上下文承载资产包。
 - 需要确认 Agent 自主沉淀候选资产的触发规则、证据要求和人工审批角色。
 - 需要确认首期工程部署策略：单体后端内模块化实现，还是直接拆分为 Agent Runtime Service 与 Asset Management Service。
+- 需要确认哪些资产类型可以发布为业务 Skill，哪些只作为 Skill 运行时引用的支撑资产。
+- 需要确认 Skill Projection Service 的实现方式：任务开始时动态投影、Agent 启动时预投影，还是按版本变更增量同步。
+- 需要确认 Skill Bundle 中脚本的安全沙箱、权限边界和审计要求。

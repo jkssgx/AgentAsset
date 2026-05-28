@@ -418,9 +418,191 @@ DeepAgents 支持类似文件系统的上下文表面，可以将任务相关资
 
 这些子 Agent 属于 DeepAgents 适配实现，不应成为资产模块的核心领域模型。
 
-## 7. 典型交互流程
+## 7. 业务 Skill 资产与 Agent Skills 投影机制
 
-### 7.1 Agent 执行调度任务
+### 7.1 基本判断
+
+主流 Agent Skills 机制通常采用文件化的消费形态：
+
+```text
+Skill 目录
+  -> SKILL.md
+  -> scripts/
+  -> references/
+  -> templates/
+```
+
+Agent 运行时先根据 Skill 的名称和描述判断是否相关，再按需读取 `SKILL.md`，最后渐进式访问脚本、参考资料、模板和工具。这种机制的核心价值是：
+
+- 避免一次性把全部能力塞进上下文。
+- 让 Agent 能按任务需要渐进读取能力说明。
+- 让复杂能力可以携带脚本、模板、参考文件和示例。
+- 让 Skill 成为 Agent 可发现、可执行、可复用的能力包。
+
+资产管理服务与这种机制不冲突。二者解决的问题不同：
+
+```text
+Agent Skills 机制：解决 Agent 如何按需发现和使用能力。
+资产管理服务：解决这些能力从哪里来、谁审批、哪个版本有效、谁能用、用了以后效果如何。
+```
+
+因此，资产服务不应替代 Agent Skills 机制，而应作为业务 Skill 的治理源头。
+
+### 7.2 Source of Truth 与 Runtime Projection
+
+推荐将业务 Skill 拆成两个层次：
+
+```text
+资产管理服务：Source of Truth
+Agent Skills 目录或后端：Runtime Projection
+Agent Runtime：Consumer
+```
+
+也就是说，正式发布的业务 Skill 资产存放在资产管理服务中，经过投影后生成 Agent 可识别的 Skill Bundle。
+
+```mermaid
+flowchart LR
+  A["资产管理服务<br/>正式资产库"] --> B["Skill Projection Service<br/>技能投影服务"]
+  B --> C["Skill Bundle<br/>SKILL.md + scripts + references"]
+  C --> D["DeepAgents Backend<br/>/skills/ 或 StoreBackend"]
+  D --> E["Agent Runtime"]
+  E --> F["按 description 匹配"]
+  F --> G["读取 SKILL.md"]
+  G --> H["按需调用脚本 / 参考文件 / 工具"]
+  H --> I["Asset Gateway<br/>权限校验与使用记录"]
+```
+
+这样，Agent 运行时仍然遵循 Skills 的渐进式披露方式；资产服务则负责企业级治理、版本、权限、审计和发布。
+
+### 7.3 Skill Projection Service
+
+`Skill Projection Service` 负责把资产服务中的业务 Skill 资产转换为 Agent 可消费的文件化结构。
+
+示例输出：
+
+```text
+/skills/
+  schedule-disruption-reschedule/
+    SKILL.md
+    references/
+      workflow.md
+      policy.md
+      examples.md
+    scripts/
+      validate_input.py
+      build_impact_report.py
+    manifest.json
+```
+
+`SKILL.md` 应保持轻量，只放 Agent 选择和启动该 Skill 所需的说明。
+
+示例：
+
+```markdown
+---
+name: schedule-disruption-reschedule
+description: 当设备故障、插单、物料短缺导致计划变更时，用于评估影响范围、加载调度约束、生成重排建议并检查审批边界。
+---
+
+## 使用方式
+
+1. 读取任务上下文中的工厂、产线、设备、订单和异常类型。
+2. 调用 Asset Gateway 获取当前发布版本的规则、案例和工具清单。
+3. 生成候选方案前必须调用 `check_policy`。
+4. 涉及跨车间调拨、交期承诺修改、正式计划写回时，必须发起审批。
+5. 输出方案时说明引用的资产编号、版本和证据链。
+
+## 支持文件
+
+- 完整流程说明见 `references/workflow.md`
+- 风险边界见 `references/policy.md`
+- 历史案例见 `references/examples.md`
+```
+
+### 7.4 哪些资产应转成 Skill
+
+不是所有资产都应转成 Agent Skill。
+
+适合转成 Skill 的资产：
+
+- 工作流资产。
+- 调度技能资产。
+- 可重复任务处理流程。
+- 带脚本或工具调用步骤的能力包。
+- 需要 Agent 自主选择调用的业务能力。
+
+示例：
+
+- 设备故障重排 Skill。
+- 插单影响评估 Skill。
+- 物料短缺分析 Skill。
+- 交期风险巡检 Skill。
+- 计划变更审批 Skill。
+
+不适合直接转成 Skill 的资产：
+
+- 单条规则。
+- 单个接口定义。
+- 单个历史案例。
+- 指标口径。
+- 术语解释。
+- 主数据语义映射。
+
+这些更适合作为 Skill 运行时检索、读取或引用的支撑资产。
+
+推荐关系：
+
+```text
+Skill 资产 = 可执行业务能力包
+规则 / 案例 / 接口 / 指标 / 术语 = Skill 可引用的支撑资产
+```
+
+### 7.5 DeepAgents 下的落地方式
+
+结合 `langchain-ai/deepagents`，首期建议：
+
+1. 资产服务维护正式 Skill 资产。
+2. Agent 启动或任务开始时，根据用户权限、工厂、产线和任务场景，从资产服务获取可用 Skill 列表。
+3. Agent Asset Adapter 调用 Skill Projection Service，将可用 Skill 投影到 DeepAgents 可读取的 `/skills/` 目录或后端存储。
+4. 创建 DeepAgent 时传入 Skill 路径和资产网关工具。
+5. Agent 根据 Skill 描述自主选择是否读取并调用 Skill。
+6. Skill 内部如需读取规则、案例、工具清单或执行业务工具，必须通过 Asset Gateway。
+7. 任务结束后，通过 `record_usage` 和 `propose_candidate` 回传使用情况和候选资产。
+
+示意：
+
+```python
+create_deep_agent(
+    model=model,
+    backend=backend,
+    skills=["/skills/"],
+    tools=[
+        search_assets,
+        get_asset,
+        resolve_context,
+        check_policy,
+        record_usage,
+        propose_candidate,
+    ],
+)
+```
+
+### 7.6 需要遵守的边界
+
+为了不违背 Agent Skills 的设计初衷，需要遵守以下边界：
+
+- 不把资产服务当成巨型知识库一次性塞给 Agent。
+- 不绕过 Skill 的渐进式披露机制。
+- 不把每个资产都包装成 Skill，避免 Skill 列表爆炸。
+- Skill Bundle 在运行时仍然表现为 `SKILL.md`、支撑文件和脚本。
+- 只有正式发布且当前用户有权使用的 Skill 资产，才能投影给正式任务 Agent。
+- 候选资产不能直接影响正式调度任务。
+- Skill 内脚本和业务工具调用必须受权限、审批和审计约束。
+- Agent 对 Skill 的使用结果必须回传资产模块，用于审计、价值度量和后续沉淀。
+
+## 8. 典型交互流程
+
+### 8.1 Agent 执行调度任务
 
 ```mermaid
 sequenceDiagram
@@ -444,7 +626,7 @@ sequenceDiagram
   A->>AG: record_usage(asset_usage)
 ```
 
-### 7.2 Agent 沉淀候选资产
+### 8.2 Agent 沉淀候选资产
 
 ```mermaid
 sequenceDiagram
@@ -462,7 +644,27 @@ sequenceDiagram
   C->>AL: 发布为正式资产
 ```
 
-## 8. 后续需要细化的问题
+### 8.3 业务 Skill 资产投影给 Agent
+
+```mermaid
+sequenceDiagram
+  participant A as Agent Runtime
+  participant AD as Agent Asset Adapter
+  participant AG as Asset Gateway
+  participant SP as Skill Projection Service
+  participant SB as Skill Backend
+
+  A->>AD: 请求当前任务可用 Skills
+  AD->>AG: 查询用户、工厂、场景可用的正式 Skill 资产
+  AG-->>AD: 返回 Skill 资产清单与版本
+  AD->>SP: projection(skills, runtime_context)
+  SP->>SB: 写入 SKILL.md、references、scripts
+  SB-->>A: 暴露 /skills/ 或后端 Skill 文件
+  A->>A: 根据 description 匹配并渐进读取 Skill
+  A->>AG: record_usage(skill_asset_id, version, task_id)
+```
+
+## 9. 后续需要细化的问题
 
 - 资产对象模型字段和不同资产类型的专属字段。
 - Agent 身份、权限和任务上下文模型。
@@ -472,3 +674,4 @@ sequenceDiagram
 - DeepAgents 工具封装方式和错误处理规范。
 - 资产价值度量指标和任务结果回传口径。
 - 首期工程部署形态：单体模块化部署，还是 Agent Runtime 与 Asset Management 分服务部署。
+- 业务 Skill 资产的字段模型、投影规则、版本同步策略和运行时缓存策略。
