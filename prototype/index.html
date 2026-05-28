@@ -1,0 +1,1153 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>工业动态调度智能体资产管理模块 - 原型</title>
+    <style>
+      :root {
+        --bg: #f5f7f4;
+        --panel: #ffffff;
+        --ink: #1f2a2e;
+        --muted: #6b7478;
+        --line: #dce2dd;
+        --teal: #14746f;
+        --teal-2: #dff2ee;
+        --blue: #2459a6;
+        --blue-2: #e5edf9;
+        --amber: #b7791f;
+        --amber-2: #fff1d6;
+        --red: #b03a2e;
+        --red-2: #fde7e3;
+        --green: #2f855a;
+        --green-2: #e1f4e8;
+        --violet: #6750a4;
+        --violet-2: #ece7fa;
+        --shadow: 0 14px 34px rgba(31, 42, 46, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Microsoft YaHei", sans-serif;
+        letter-spacing: 0;
+      }
+
+      .screen {
+        width: 1440px;
+        height: 960px;
+        overflow: hidden;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.72), transparent 360px),
+          var(--bg);
+        display: grid;
+        grid-template-columns: 236px 1fr;
+      }
+
+      .sidebar {
+        background: #24312f;
+        color: #eef5f2;
+        padding: 26px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+
+      .brand {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 0 8px 18px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.13);
+      }
+
+      .logo {
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #40b5a7, #f3ba4d);
+        display: grid;
+        place-items: center;
+        font-weight: 800;
+        color: #17322f;
+      }
+
+      .brand b {
+        display: block;
+        font-size: 16px;
+      }
+
+      .brand span {
+        display: block;
+        color: rgba(238, 245, 242, 0.68);
+        font-size: 12px;
+        margin-top: 3px;
+      }
+
+      .nav {
+        display: grid;
+        gap: 6px;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 42px;
+        padding: 0 12px;
+        border-radius: 8px;
+        color: rgba(238, 245, 242, 0.78);
+        font-size: 14px;
+      }
+
+      .nav-item.active {
+        color: #ffffff;
+        background: rgba(64, 181, 167, 0.24);
+      }
+
+      .nav-icon {
+        width: 18px;
+        text-align: center;
+        opacity: 0.92;
+      }
+
+      .sidebar-foot {
+        margin-top: auto;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 8px;
+        padding: 14px;
+        color: rgba(238, 245, 242, 0.76);
+        font-size: 12px;
+        line-height: 1.7;
+      }
+
+      .main {
+        padding: 24px 28px 32px;
+        overflow: hidden;
+      }
+
+      .topbar {
+        height: 54px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 22px;
+      }
+
+      .title h1 {
+        margin: 0;
+        font-size: 28px;
+        line-height: 1.2;
+      }
+
+      .title p {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .search {
+        width: 300px;
+        height: 40px;
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 0 13px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .btn {
+        height: 40px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--ink);
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+        justify-content: center;
+        padding: 0 14px;
+        font-weight: 650;
+        font-size: 13px;
+      }
+
+      .btn.primary {
+        border-color: var(--teal);
+        background: var(--teal);
+        color: #fff;
+      }
+
+      .grid {
+        display: grid;
+        gap: 18px;
+      }
+
+      .cols-4 {
+        grid-template-columns: repeat(4, 1fr);
+      }
+
+      .cols-main {
+        grid-template-columns: 1.42fr 0.95fr;
+        align-items: start;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+      }
+
+      .metric {
+        padding: 18px;
+        min-height: 118px;
+      }
+
+      .metric .label {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .metric .value {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        margin-top: 10px;
+        font-size: 32px;
+        font-weight: 780;
+      }
+
+      .metric .trend {
+        color: var(--green);
+        font-size: 13px;
+        font-weight: 680;
+      }
+
+      .metric .sub {
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .section-head {
+        padding: 17px 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .section-head h2 {
+        margin: 0;
+        font-size: 17px;
+      }
+
+      .tabs {
+        display: flex;
+        background: #eef2ef;
+        padding: 3px;
+        border-radius: 8px;
+        gap: 3px;
+      }
+
+      .tab {
+        border-radius: 6px;
+        padding: 7px 10px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .tab.active {
+        background: #fff;
+        color: var(--ink);
+        box-shadow: 0 1px 4px rgba(31, 42, 46, 0.08);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
+
+      th,
+      td {
+        padding: 14px 18px;
+        text-align: left;
+        border-bottom: 1px solid #edf0ed;
+        font-size: 13px;
+        vertical-align: middle;
+      }
+
+      th {
+        color: var(--muted);
+        font-weight: 700;
+        background: #fafbf9;
+      }
+
+      td strong {
+        display: block;
+        font-size: 14px;
+        margin-bottom: 4px;
+      }
+
+      td small {
+        color: var(--muted);
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        height: 24px;
+        padding: 0 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 680;
+        white-space: nowrap;
+      }
+
+      .tag.teal {
+        color: var(--teal);
+        background: var(--teal-2);
+      }
+
+      .tag.blue {
+        color: var(--blue);
+        background: var(--blue-2);
+      }
+
+      .tag.amber {
+        color: var(--amber);
+        background: var(--amber-2);
+      }
+
+      .tag.red {
+        color: var(--red);
+        background: var(--red-2);
+      }
+
+      .tag.green {
+        color: var(--green);
+        background: var(--green-2);
+      }
+
+      .tag.violet {
+        color: var(--violet);
+        background: var(--violet-2);
+      }
+
+      .queue {
+        padding: 16px;
+        display: grid;
+        gap: 12px;
+      }
+
+      .queue-item {
+        border: 1px solid #e7ece8;
+        border-radius: 8px;
+        padding: 14px;
+        display: grid;
+        gap: 10px;
+        background: #fff;
+      }
+
+      .queue-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .queue-title {
+        font-weight: 740;
+        font-size: 14px;
+      }
+
+      .queue-desc {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .mini-bars {
+        display: flex;
+        align-items: end;
+        gap: 5px;
+        height: 46px;
+      }
+
+      .mini-bars i {
+        display: block;
+        width: 18px;
+        border-radius: 4px 4px 0 0;
+        background: var(--teal);
+      }
+
+      .detail-layout {
+        display: grid;
+        grid-template-columns: 1fr 336px;
+        gap: 18px;
+      }
+
+      .hero-asset {
+        padding: 22px;
+        display: grid;
+        grid-template-columns: 1fr 230px;
+        gap: 22px;
+        align-items: stretch;
+      }
+
+      .asset-title h1 {
+        margin: 6px 0 10px;
+        font-size: 30px;
+      }
+
+      .asset-title p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.7;
+        font-size: 14px;
+      }
+
+      .asset-meta {
+        margin-top: 18px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .scorebox {
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        padding: 18px;
+        background: #f7faf7;
+      }
+
+      .scorebox .num {
+        font-size: 42px;
+        font-weight: 820;
+      }
+
+      .scorebox .caption {
+        color: var(--muted);
+        margin-top: 4px;
+        font-size: 13px;
+      }
+
+      .progress {
+        margin-top: 16px;
+        height: 10px;
+        border-radius: 999px;
+        background: #e3e9e4;
+        overflow: hidden;
+      }
+
+      .progress b {
+        display: block;
+        height: 100%;
+        background: linear-gradient(90deg, var(--teal), #f0b54c);
+      }
+
+      .timeline {
+        padding: 18px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .step {
+        display: grid;
+        grid-template-columns: 28px 1fr auto;
+        gap: 12px;
+        align-items: start;
+      }
+
+      .dot {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: var(--teal-2);
+        color: var(--teal);
+        font-weight: 800;
+        font-size: 12px;
+      }
+
+      .step h3 {
+        margin: 0 0 5px;
+        font-size: 14px;
+      }
+
+      .step p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.6;
+        font-size: 12px;
+      }
+
+      .kv {
+        padding: 18px;
+        display: grid;
+        gap: 12px;
+      }
+
+      .kv-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #edf0ed;
+        font-size: 13px;
+      }
+
+      .kv-row span:first-child {
+        color: var(--muted);
+      }
+
+      .evidence {
+        padding: 18px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+      }
+
+      .evidence .box {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+        background: #fbfcfb;
+      }
+
+      .box b {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 14px;
+      }
+
+      .box p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.6;
+        font-size: 12px;
+      }
+
+      .analytics {
+        display: grid;
+        grid-template-columns: 1.25fr 0.85fr;
+        gap: 18px;
+      }
+
+      .chart {
+        height: 318px;
+        padding: 22px;
+        display: grid;
+        grid-template-rows: 1fr auto;
+        gap: 20px;
+      }
+
+      .chart-area {
+        position: relative;
+        border-left: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .line {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: #edf0ed;
+      }
+
+      .point {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--teal);
+        border: 3px solid #fff;
+        box-shadow: 0 0 0 1px var(--teal);
+      }
+
+      .path {
+        position: absolute;
+        inset: 0;
+      }
+
+      .chart-labels {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .impact-list {
+        padding: 18px;
+        display: grid;
+        gap: 12px;
+      }
+
+      .impact {
+        display: grid;
+        grid-template-columns: 92px 1fr 52px;
+        gap: 12px;
+        align-items: center;
+        font-size: 13px;
+      }
+
+      .bar {
+        height: 10px;
+        border-radius: 999px;
+        background: #e7ece8;
+        overflow: hidden;
+      }
+
+      .bar b {
+        display: block;
+        height: 100%;
+        border-radius: 999px;
+        background: var(--blue);
+      }
+
+      .band {
+        padding: 18px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+      }
+
+      .tile {
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: #fbfcfb;
+        padding: 16px;
+      }
+
+      .tile span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .tile b {
+        display: block;
+        margin-top: 8px;
+        font-size: 24px;
+      }
+
+      .page-break {
+        height: 32px;
+        background: #0f1716;
+      }
+    </style>
+  </head>
+  <body>
+    <section class="screen" id="screen-dashboard">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="logo">AA</div>
+          <div>
+            <b>AgentAsset</b>
+            <span>调度智能体资产中枢</span>
+          </div>
+        </div>
+        <nav class="nav">
+          <div class="nav-item active"><span class="nav-icon">⌘</span>资产工作台</div>
+          <div class="nav-item"><span class="nav-icon">▣</span>资产库</div>
+          <div class="nav-item"><span class="nav-icon">◇</span>候选沉淀</div>
+          <div class="nav-item"><span class="nav-icon">✓</span>验证审批</div>
+          <div class="nav-item"><span class="nav-icon">↗</span>Agent 引用链</div>
+          <div class="nav-item"><span class="nav-icon">◎</span>价值度量</div>
+          <div class="nav-item"><span class="nav-icon">⚙</span>治理配置</div>
+        </nav>
+        <div class="sidebar-foot">
+          当前工厂：苏州一厂<br />
+          场景范围：插单、设备异常、物料短缺、交期风险
+        </div>
+      </aside>
+      <main class="main">
+        <div class="topbar">
+          <div class="title">
+            <h1>资产工作台</h1>
+            <p>围绕调度任务沉淀、验证、发布可复用的 Agent 资产</p>
+          </div>
+          <div class="actions">
+            <div class="search">⌕ 搜索规则、案例、工作流、接口</div>
+            <button class="btn">⇅ 同步系统资产</button>
+            <button class="btn primary">＋ 新建资产</button>
+          </div>
+        </div>
+
+        <div class="grid cols-4">
+          <div class="card metric">
+            <div class="label">已发布资产</div>
+            <div class="value">286 <span class="trend">+18</span></div>
+            <div class="sub">本月新增已验证规则与案例</div>
+          </div>
+          <div class="card metric">
+            <div class="label">候选资产</div>
+            <div class="value">42 <span class="trend">+9</span></div>
+            <div class="sub">来自真实调度任务复盘</div>
+          </div>
+          <div class="card metric">
+            <div class="label">Agent 引用次数</div>
+            <div class="value">1,847 <span class="trend">+21%</span></div>
+            <div class="sub">近 30 天调度任务引用</div>
+          </div>
+          <div class="card metric">
+            <div class="label">高风险待治理</div>
+            <div class="value">7 <span class="trend" style="color: var(--red)">需处理</span></div>
+            <div class="sub">涉及写回、跨车间调拨、交期承诺</div>
+          </div>
+        </div>
+
+        <div style="height: 18px"></div>
+        <div class="grid cols-main">
+          <div class="card">
+            <div class="section-head">
+              <h2>资产清单</h2>
+              <div class="tabs">
+                <span class="tab active">全部</span>
+                <span class="tab">规则约束</span>
+                <span class="tab">工作流</span>
+                <span class="tab">案例</span>
+                <span class="tab">接口</span>
+              </div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 34%">资产</th>
+                  <th>类型</th>
+                  <th>状态</th>
+                  <th>适用范围</th>
+                  <th>最近引用</th>
+                  <th>价值评分</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <strong>瓶颈设备故障局部重排策略</strong>
+                    <small>设备停机超过 30 分钟时优先局部重排</small>
+                  </td>
+                  <td><span class="tag teal">工作流</span></td>
+                  <td><span class="tag green">已发布</span></td>
+                  <td>总装一线 / A 类订单</td>
+                  <td>14 分钟前</td>
+                  <td>92</td>
+                </tr>
+                <tr>
+                  <td>
+                    <strong>医疗客户急单优先级规则</strong>
+                    <small>延期风险超过 8 小时进入升级队列</small>
+                  </td>
+                  <td><span class="tag blue">规则</span></td>
+                  <td><span class="tag amber">待审批</span></td>
+                  <td>医疗产品族</td>
+                  <td>2 小时前</td>
+                  <td>86</td>
+                </tr>
+                <tr>
+                  <td>
+                    <strong>MES 设备状态查询接口</strong>
+                    <small>读取设备状态、停机原因、恢复时间</small>
+                  </td>
+                  <td><span class="tag violet">接口</span></td>
+                  <td><span class="tag green">已发布</span></td>
+                  <td>苏州一厂</td>
+                  <td>5 分钟前</td>
+                  <td>95</td>
+                </tr>
+                <tr>
+                  <td>
+                    <strong>物料短缺冻结区处理案例</strong>
+                    <small>替代物料失败后冻结低优先级订单</small>
+                  </td>
+                  <td><span class="tag amber">案例</span></td>
+                  <td><span class="tag teal">验证中</span></td>
+                  <td>电子二车间</td>
+                  <td>昨天</td>
+                  <td>78</td>
+                </tr>
+                <tr>
+                  <td>
+                    <strong>跨班生产安全间隔约束</strong>
+                    <small>换型清线后必须保留安全确认窗口</small>
+                  </td>
+                  <td><span class="tag blue">规则</span></td>
+                  <td><span class="tag red">冲突待解</span></td>
+                  <td>包装线</td>
+                  <td>3 天前</td>
+                  <td>64</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card">
+            <div class="section-head">
+              <h2>候选资产队列</h2>
+              <span class="tag amber">42 待处理</span>
+            </div>
+            <div class="queue">
+              <div class="queue-item">
+                <div class="queue-top">
+                  <div class="queue-title">插单影响评估新经验</div>
+                  <span class="tag teal">Agent 提炼</span>
+                </div>
+                <div class="queue-desc">
+                  计划员连续 3 次采纳“冻结低价值尾单”的建议，建议转为候选策略。
+                </div>
+              </div>
+              <div class="queue-item">
+                <div class="queue-top">
+                  <div class="queue-title">设备 E-17 恢复时间口径</div>
+                  <span class="tag blue">语义映射</span>
+                </div>
+                <div class="queue-desc">
+                  MES 与 EAM 的恢复时间字段存在 12 分钟偏差，需要统一解释。
+                </div>
+              </div>
+              <div class="queue-item">
+                <div class="queue-top">
+                  <div class="queue-title">物料替代审批节点</div>
+                  <span class="tag red">高风险</span>
+                </div>
+                <div class="queue-desc">
+                  涉及采购承诺与质量放行，发布前必须加入人工确认点。
+                </div>
+              </div>
+              <div class="mini-bars">
+                <i style="height: 24px"></i><i style="height: 38px; background: var(--blue)"></i
+                ><i style="height: 30px"></i><i style="height: 44px; background: var(--amber)"></i
+                ><i style="height: 28px; background: var(--green)"></i><i style="height: 36px"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </section>
+
+    <div class="page-break"></div>
+
+    <section class="screen" id="screen-detail">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="logo">AA</div>
+          <div>
+            <b>AgentAsset</b>
+            <span>调度智能体资产中枢</span>
+          </div>
+        </div>
+        <nav class="nav">
+          <div class="nav-item"><span class="nav-icon">⌘</span>资产工作台</div>
+          <div class="nav-item active"><span class="nav-icon">▣</span>资产库</div>
+          <div class="nav-item"><span class="nav-icon">◇</span>候选沉淀</div>
+          <div class="nav-item"><span class="nav-icon">✓</span>验证审批</div>
+          <div class="nav-item"><span class="nav-icon">↗</span>Agent 引用链</div>
+          <div class="nav-item"><span class="nav-icon">◎</span>价值度量</div>
+          <div class="nav-item"><span class="nav-icon">⚙</span>治理配置</div>
+        </nav>
+        <div class="sidebar-foot">
+          资产状态：已发布<br />
+          当前版本：v3.2，可回滚至 v3.1
+        </div>
+      </aside>
+      <main class="main">
+        <div class="topbar">
+          <div class="title">
+            <h1>资产详情</h1>
+            <p>查看可执行知识、适用范围、证据链和治理状态</p>
+          </div>
+          <div class="actions">
+            <button class="btn">⎘ 版本对比</button>
+            <button class="btn">↺ 回滚</button>
+            <button class="btn primary">✓ 发起复审</button>
+          </div>
+        </div>
+
+        <div class="detail-layout">
+          <div class="grid">
+            <div class="card hero-asset">
+              <div class="asset-title">
+                <span class="tag teal">工作流资产</span>
+                <h1>瓶颈设备故障局部重排策略</h1>
+                <p>
+                  当关键设备停机预计超过 30 分钟时，Agent 先识别受影响订单与在制品，
+                  再调用约束校验和排程求解器生成局部重排方案，跨车间调拨与承诺交期修改必须进入人工审批。
+                </p>
+                <div class="asset-meta">
+                  <span class="tag green">已发布</span>
+                  <span class="tag blue">总装一线</span>
+                  <span class="tag amber">设备异常</span>
+                  <span class="tag violet">Agent 可读取与分析</span>
+                </div>
+              </div>
+              <div class="scorebox">
+                <div class="num">92</div>
+                <div class="caption">综合价值评分</div>
+                <div class="progress"><b style="width: 92%"></b></div>
+                <p style="color: var(--muted); line-height: 1.7; font-size: 12px">
+                  近 30 天被 126 个调度任务引用，人工接管率下降 18%。
+                </p>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="section-head">
+                <h2>执行链路</h2>
+                <span class="tag blue">7 个步骤 / 2 个人工节点</span>
+              </div>
+              <div class="timeline">
+                <div class="step">
+                  <div class="dot">1</div>
+                  <div>
+                    <h3>识别影响范围</h3>
+                    <p>读取 MES 设备状态、当前计划、在制品与未开工订单。</p>
+                  </div>
+                  <span class="tag violet">读取</span>
+                </div>
+                <div class="step">
+                  <div class="dot">2</div>
+                  <div>
+                    <h3>匹配约束与策略</h3>
+                    <p>加载设备兼容、工序依赖、换型成本和客户优先级规则。</p>
+                  </div>
+                  <span class="tag blue">分析</span>
+                </div>
+                <div class="step">
+                  <div class="dot">3</div>
+                  <div>
+                    <h3>生成候选方案</h3>
+                    <p>局部重排优先；若延期风险超过阈值，再扩大到车间级重排。</p>
+                  </div>
+                  <span class="tag teal">建议</span>
+                </div>
+                <div class="step">
+                  <div class="dot">4</div>
+                  <div>
+                    <h3>人工审批</h3>
+                    <p>涉及跨车间调拨、交期承诺或加班超过 2 小时，必须确认。</p>
+                  </div>
+                  <span class="tag amber">审批</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="section-head">
+                <h2>证据与复用依据</h2>
+                <span class="tag green">已通过 18 个回归案例</span>
+              </div>
+              <div class="evidence">
+                <div class="box">
+                  <b>真实案例</b>
+                  <p>2026-04-18 E-17 停机 46 分钟，局部重排后准交率保持 96.8%。</p>
+                </div>
+                <div class="box">
+                  <b>专家反馈</b>
+                  <p>计划主管确认“先局部后全局”的判断路径符合现场经验。</p>
+                </div>
+                <div class="box">
+                  <b>安全边界</b>
+                  <p>禁止直接写回正式计划；必须通过计划变更单下发。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid">
+            <div class="card">
+              <div class="section-head">
+                <h2>治理信息</h2>
+              </div>
+              <div class="kv">
+                <div class="kv-row"><span>资产编号</span><b>WF-RES-032</b></div>
+                <div class="kv-row"><span>负责人</span><b>计划优化组</b></div>
+                <div class="kv-row"><span>审批人</span><b>生产经理 / IT 安全</b></div>
+                <div class="kv-row"><span>有效期</span><b>2026-05-01 至 2026-11-01</b></div>
+                <div class="kv-row"><span>Agent 权限</span><b>读取、分析、发起申请</b></div>
+                <div class="kv-row"><span>风险等级</span><b style="color: var(--amber)">中</b></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="section-head">
+                <h2>关联资产</h2>
+              </div>
+              <div class="queue">
+                <div class="queue-item">
+                  <div class="queue-title">MES 设备状态查询接口</div>
+                  <div class="queue-desc">提供停机原因、恢复时间和设备可用状态。</div>
+                </div>
+                <div class="queue-item">
+                  <div class="queue-title">换型成本权重配置</div>
+                  <div class="queue-desc">影响方案比选时的优化目标排序。</div>
+                </div>
+                <div class="queue-item">
+                  <div class="queue-title">交期风险升级规则</div>
+                  <div class="queue-desc">决定是否扩大重排范围并通知客户经理。</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </section>
+
+    <div class="page-break"></div>
+
+    <section class="screen" id="screen-analytics">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="logo">AA</div>
+          <div>
+            <b>AgentAsset</b>
+            <span>调度智能体资产中枢</span>
+          </div>
+        </div>
+        <nav class="nav">
+          <div class="nav-item"><span class="nav-icon">⌘</span>资产工作台</div>
+          <div class="nav-item"><span class="nav-icon">▣</span>资产库</div>
+          <div class="nav-item"><span class="nav-icon">◇</span>候选沉淀</div>
+          <div class="nav-item"><span class="nav-icon">✓</span>验证审批</div>
+          <div class="nav-item"><span class="nav-icon">↗</span>Agent 引用链</div>
+          <div class="nav-item active"><span class="nav-icon">◎</span>价值度量</div>
+          <div class="nav-item"><span class="nav-icon">⚙</span>治理配置</div>
+        </nav>
+        <div class="sidebar-foot">
+          度量周期：近 30 天<br />
+          统计口径：正式任务、仿真任务、审批结果
+        </div>
+      </aside>
+      <main class="main">
+        <div class="topbar">
+          <div class="title">
+            <h1>资产价值度量</h1>
+            <p>追踪资产是否真正提升排程质量、决策效率与业务结果</p>
+          </div>
+          <div class="actions">
+            <div class="search">⌕ 选择资产或任务场景</div>
+            <button class="btn">▦ 导出报告</button>
+            <button class="btn primary">⟳ 刷新评估</button>
+          </div>
+        </div>
+
+        <div class="grid cols-4">
+          <div class="card metric">
+            <div class="label">准交率提升</div>
+            <div class="value">+4.6%</div>
+            <div class="sub">相比未引用资产任务</div>
+          </div>
+          <div class="card metric">
+            <div class="label">人工调整次数</div>
+            <div class="value">-31%</div>
+            <div class="sub">平均每个异常任务</div>
+          </div>
+          <div class="card metric">
+            <div class="label">建议采纳率</div>
+            <div class="value">73%</div>
+            <div class="sub">已剔除只读查询任务</div>
+          </div>
+          <div class="card metric">
+            <div class="label">高风险拦截</div>
+            <div class="value">19</div>
+            <div class="sub">写回前被审批规则拦截</div>
+          </div>
+        </div>
+
+        <div style="height: 18px"></div>
+        <div class="analytics">
+          <div class="card">
+            <div class="section-head">
+              <h2>资产引用与业务结果趋势</h2>
+              <div class="tabs">
+                <span class="tab active">准交率</span>
+                <span class="tab">接管率</span>
+                <span class="tab">换型成本</span>
+              </div>
+            </div>
+            <div class="chart">
+              <div class="chart-area">
+                <div class="line" style="top: 20%"></div>
+                <div class="line" style="top: 40%"></div>
+                <div class="line" style="top: 60%"></div>
+                <div class="line" style="top: 80%"></div>
+                <svg class="path" viewBox="0 0 720 230" preserveAspectRatio="none">
+                  <polyline
+                    points="22,172 155,150 288,132 421,96 554,84 690,58"
+                    fill="none"
+                    stroke="#14746f"
+                    stroke-width="5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <polyline
+                    points="22,188 155,176 288,160 421,144 554,132 690,126"
+                    fill="none"
+                    stroke="#2459a6"
+                    stroke-width="4"
+                    stroke-linecap="round"
+                    stroke-dasharray="10 9"
+                  />
+                </svg>
+                <i class="point" style="left: 3%; top: 72%"></i>
+                <i class="point" style="left: 22%; top: 62%"></i>
+                <i class="point" style="left: 41%; top: 54%"></i>
+                <i class="point" style="left: 60%; top: 38%"></i>
+                <i class="point" style="left: 79%; top: 32%"></i>
+                <i class="point" style="left: 96%; top: 21%"></i>
+              </div>
+              <div class="chart-labels">
+                <span>第 1 周</span><span>第 2 周</span><span>第 3 周</span><span>第 4 周</span><span>第 5 周</span><span>当前</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="section-head">
+              <h2>场景贡献排行</h2>
+              <span class="tag teal">按收益排序</span>
+            </div>
+            <div class="impact-list">
+              <div class="impact"><span>设备异常</span><div class="bar"><b style="width: 92%"></b></div><b>92</b></div>
+              <div class="impact"><span>插单评估</span><div class="bar"><b style="width: 84%; background: var(--teal)"></b></div><b>84</b></div>
+              <div class="impact"><span>物料短缺</span><div class="bar"><b style="width: 76%; background: var(--amber)"></b></div><b>76</b></div>
+              <div class="impact"><span>交期巡检</span><div class="bar"><b style="width: 68%; background: var(--green)"></b></div><b>68</b></div>
+              <div class="impact"><span>换型优化</span><div class="bar"><b style="width: 61%; background: var(--violet)"></b></div><b>61</b></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height: 18px"></div>
+        <div class="card">
+          <div class="section-head">
+            <h2>资产飞轮健康度</h2>
+            <span class="tag green">整体健康</span>
+          </div>
+          <div class="band">
+            <div class="tile"><span>真实任务沉淀率</span><b>28%</b></div>
+            <div class="tile"><span>候选验证通过率</span><b>64%</b></div>
+            <div class="tile"><span>发布后复用率</span><b>71%</b></div>
+            <div class="tile"><span>过期资产占比</span><b style="color: var(--amber)">6%</b></div>
+          </div>
+        </div>
+      </main>
+    </section>
+  </body>
+</html>
