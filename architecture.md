@@ -716,6 +716,7 @@ Skill Projection Service：Python 模块
 缓存 / 轻量队列：Redis
 文件与附件存储：MinIO 或 S3 兼容对象存储
 接口协议：OpenAPI / HTTP JSON
+前端交互页面：React + TypeScript + Vite + Ant Design
 ```
 
 这种方案的优点：
@@ -736,7 +737,61 @@ Asset Management Service
 
 也就是说，即使语言统一，也不能把资产管理逻辑直接写死在 Agent Runtime 内。
 
-### 9.3 长期演进选项
+### 9.3 前端交互页面技术选型
+
+首期前端交互页面推荐采用：
+
+```text
+React + TypeScript + Vite + Ant Design
+```
+
+配套技术栈建议：
+
+```text
+构建工具：Vite
+前端框架：React + TypeScript
+UI 组件库：Ant Design
+图标：@ant-design/icons，必要时补充 lucide-react
+路由：React Router
+服务请求与缓存：TanStack Query
+本地状态：Zustand
+表格：Ant Design Table，复杂高级表格场景可引入 ProComponents
+表单：Ant Design Form，复杂规则校验可结合 Zod
+图表：ECharts 或 Ant Design Charts
+流程图 / 关系图：React Flow
+Mock：MSW 或本地 mock 数据
+```
+
+选择 Ant Design 的主要原因：
+
+- 本模块属于典型企业级中后台工作台，资产台账、审批流、版本记录、治理配置和价值分析都适合 Ant Design 的组件体系。
+- 表格、筛选、表单、抽屉、弹窗、步骤条、状态标签等高频交互可以开箱即用，利于快速形成可评审、可迭代的页面。
+- 中文企业系统接受度高，适合工业调度、资产治理、审批管理等业务语境。
+- 首期可以优先保障交互完整性和工程交付效率，后续再根据产品视觉要求做主题定制。
+
+建议首期前端工程结构：
+
+```text
+frontend/
+  src/
+    app/              # 路由、布局、全局入口
+    pages/            # 资产工作台、资产详情、价值分析、审批队列
+    features/         # asset、candidate、governance、analytics、agent-usage
+    components/       # 通用组件与业务组件
+    api/              # 接口 client、query hooks
+    mock/             # 首期 mock 数据
+    types/            # 资产对象、审批流、Agent 引用记录等类型
+```
+
+前端落地节奏建议：
+
+```text
+第一阶段：基于 React + Ant Design + mock 数据，将当前 prototype 静态原型迁移为可交互页面。
+第二阶段：对接 FastAPI OpenAPI 接口，打通资产列表、资产详情、候选资产、审批状态和价值指标。
+第三阶段：补齐资产依赖图、Agent 引用链、工作流编排、实时任务轨迹等复杂交互能力。
+```
+
+### 9.4 长期演进选项
 
 如果后续资产管理模块变成企业级治理系统，并且需要重度处理以下能力：
 
@@ -770,12 +825,12 @@ Agent Runtime 按 DeepAgents Python 生态建设。
 二者通过稳定 Asset Gateway 协议解耦。
 ```
 
-### 9.4 当前建议
+### 9.5 当前建议
 
 当前阶段更推荐：
 
 ```text
-Python FastAPI + Python DeepAgents + PostgreSQL + pgvector
+Python FastAPI + Python DeepAgents + PostgreSQL + pgvector + React + TypeScript + Vite + Ant Design
 ```
 
 但架构上保留独立服务边界和 Asset Gateway 协议边界。这样既能快速形成 MVP，又不会阻塞后续将资产管理核心迁移或拆分为更重的企业级服务。
@@ -791,4 +846,5 @@ Python FastAPI + Python DeepAgents + PostgreSQL + pgvector
 - 资产价值度量指标和任务结果回传口径。
 - 首期工程部署形态：单体模块化部署，还是 Agent Runtime 与 Asset Management 分服务部署。
 - 业务 Skill 资产的字段模型、投影规则、版本同步策略和运行时缓存策略。
+- 首期前端页面如何从 `prototype/index.html` 迁移到 React + Ant Design 工程。
 - 首期是否统一采用 Python FastAPI + Python DeepAgents，长期是否保留 Java/Kotlin 资产治理服务演进路径。
