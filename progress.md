@@ -21,12 +21,12 @@
 - 初步沉淀首期技术栈建议：Python FastAPI + Python DeepAgents + PostgreSQL + pgvector，长期保留 Java/Kotlin + Spring Boot 作为企业级资产治理服务的演进选项。
 - 确认前端交互页面首期技术选型：React + TypeScript + Vite + Ant Design，配套 React Router、TanStack Query、Zustand、ECharts / Ant Design Charts、React Flow 等能力。
 - 明确前端首期优先采用 Ant Design 的原因：适合企业级中后台资产台账、表单筛选、审批流、版本记录、治理配置和价值分析等高频页面，能够提升交互页面落地效率。
+- 完成 `PRD.md` 产品设计文档，覆盖产品定位、用户角色、资产范围、核心功能、交互逻辑、页面信息架构、页面草图、MVP 范围和验收标准。
 
 ## 后续规划
 
 - 根据评审反馈确定主视觉方向、信息密度和页面结构。
 - 继续补齐候选资产沉淀、验证审批、Agent 引用链、治理配置等关键页面。
-- 将确认后的产品需求沉淀到 `PRD.md`。
 - 基于当前 `prototype/index.html`，规划并搭建 `frontend/` 前端工程骨架，将静态原型迁移为 React + Ant Design 可交互页面。
 - 继续细化 `architecture.md` 中的资产对象模型、业务 Skill 资产模型、Agent 任务上下文模型、权限模型、候选资产验证机制、DeepAgents 适配实现和首期技术栈边界。
 
