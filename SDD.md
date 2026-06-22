@@ -336,6 +336,8 @@ erDiagram
     agent_task_trace ||--o{ policy_check_record : checks
     validation_run ||--o{ asset_validation_result : contains
     approval_instance ||--o{ approval_step : contains
+    scope_node ||--o{ scope_closure : ancestor
+    scope_node ||--o{ scope_closure : descendant
 ```
 
 ### 4.3 枚举字典
@@ -344,9 +346,11 @@ erDiagram
 | --- | --- | --- |
 | asset_type | `rule`、`workflow`、`tool`、`case`、`metric`、`term`、`dataset`、`skill` | 资产类型 |
 | asset_status | `draft`、`pending_validation`、`validating`、`pending_approval`、`published`、`disabled`、`deprecated`、`rejected` | 正式资产状态；候选状态只存在于 `asset_candidate` |
+| asset_version_status | `draft`、`pending_validation`、`validating`、`validation_failed`、`pending_approval`、`approved`、`published`、`archived`、`rejected`、`withdrawn` | 资产版本状态；用于描述单个版本从草稿到发布、归档或撤回的生命周期 |
 | risk_level | `low`、`medium`、`high`、`critical` | 风险等级 |
 | source_type | `manual`、`upload`、`system_sync`、`agent_trace`、`review_meeting`、`api_import` | 资产来源 |
 | permission_action | `view`、`edit`、`approve`、`agent_read`、`agent_suggest`、`agent_apply`、`agent_execute` | 权限动作 |
+| scope_type | `org`、`factory`、`workshop`、`line`、`workstation`、`equipment`、`product_family`、`product`、`process`、`customer_type`、`scenario` | 资产适用范围类型 |
 | usage_role | `context`、`tool`、`policy`、`case_reference`、`metric_eval`、`skill_runtime` | Agent 使用资产的方式 |
 | validation_status | `not_started`、`running`、`passed`、`failed`、`warning`、`cancelled` | 验证状态 |
 | approval_status | `pending`、`approved`、`rejected`、`withdrawn`、`cancelled` | 审批状态 |
@@ -433,6 +437,61 @@ erDiagram
 | --- | --- |
 | uk_asset_version_no | asset_id, version_no |
 
+状态说明：
+
+- `draft`：版本草稿，允许编辑，不可被 Agent 正式使用。
+- `pending_validation`：已提交验证，等待验证任务开始。
+- `validating`：验证中。
+- `validation_failed`：验证未通过，需要修改后重新提交。
+- `pending_approval`：验证通过，等待人工审批。
+- `approved`：审批通过但尚未正式发布，通常用于预约生效或发布前确认。
+- `published`：当前或曾经正式发布过的版本；只有 `published` 版本可以成为 `asset.current_version_id`。
+- `archived`：历史发布版本，已被新版本替代，仍可用于审计和任务回放。
+- `rejected`：审批驳回，不可发布。
+- `withdrawn`：提交人主动撤回，不再继续当前发布流程。
+
+`asset.status` 描述资产整体是否可用，`asset_version.status` 描述某个版本所处的发布流程。一个资产可以有多个版本，但同一时间原则上只能有一个当前生效版本。
+
+#### scope_node：范围节点表
+
+该表用于维护资产适用范围可选择的业务对象节点，例如组织、工厂、车间、产线、工位、设备、产品族、产品、工艺、客户类型和业务场景。它为 `asset_scope.scope_type + scope_code` 提供标准字典来源，避免范围编码只存在于资产表中而无法校验。若企业已有统一主数据或组织/资源层级服务，本表可以作为本模块的只读同步快照；若首期没有外部服务，则本表承担本地范围字典职责。
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| id | uuid | 是 | 范围节点 ID |
+| scope_type | varchar(32) | 是 | 范围类型，取值见 `scope_type` 枚举 |
+| scope_code | varchar(128) | 是 | 范围编码 |
+| scope_name | varchar(200) | 是 | 范围名称 |
+| parent_id | uuid | 否 | 直接父节点 ID |
+| source_system | varchar(64) | 否 | 来源系统，例如 ERP、MES、APS、MDM |
+| source_ref_id | varchar(128) | 否 | 来源系统对象 ID |
+| enabled | boolean | 是 | 是否启用 |
+| created_at | timestamptz | 是 | 创建时间 |
+| updated_at | timestamptz | 是 | 更新时间 |
+
+唯一约束：
+
+| 约束 | 字段 |
+| --- | --- |
+| uk_scope_node_type_code | scope_type, scope_code |
+
+#### scope_closure：范围层级闭包表
+
+该表用于维护范围节点之间的祖先和后代关系，支撑 `asset_scope.include_children = true` 时快速判断某个任务上下文是否落在资产适用范围内。仅有 `asset_scope` 表无法知道“苏州一厂是否包含总装车间、总装一线、设备 E-17”，因此需要通过本表或外部层级服务维护上下级关系。使用闭包表而不是只依赖 `parent_id`，是为了提升多层级范围匹配、权限判断和批量检索性能。
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| ancestor_id | uuid | 是 | 祖先范围节点 ID |
+| descendant_id | uuid | 是 | 后代范围节点 ID |
+| depth | int | 是 | 层级深度；0 表示节点自身，1 表示直接子级 |
+| created_at | timestamptz | 是 | 创建时间 |
+
+唯一约束：
+
+| 约束 | 字段 |
+| --- | --- |
+| pk_scope_closure | ancestor_id, descendant_id |
+
 #### asset_scope：资产适用范围表
 
 该表用于描述资产可以在哪些业务范围内生效，例如工厂、车间、产线、产品族、工艺、客户类型或调度场景。Asset Gateway 在检索资产、组装上下文和执行治理校验时，需要先根据任务上下文匹配该表，避免 Agent 在错误场景下使用资产。默认按资产级范围管理；当某个版本的适用范围发生变化时，可通过 `asset_version_id` 固化版本级范围快照。
@@ -442,12 +501,19 @@ erDiagram
 | id | uuid | 是 | 唯一标识 |
 | asset_id | uuid | 是 | 资产 ID |
 | asset_version_id | uuid | 否 | 版本 ID；为空表示资产级范围，非空表示该版本的范围快照 |
-| scope_type | varchar(32) | 是 | 范围类型：`factory`、`workshop`、`line`、`product_family`、`process`、`customer_type`、`scenario` |
+| scope_type | varchar(32) | 是 | 范围类型，取值见 `scope_type` 枚举 |
 | scope_code | varchar(128) | 是 | 范围编码 |
 | scope_name | varchar(200) | 否 | 范围名称 |
 | include_children | boolean | 是 | 是否包含下级范围 |
 | priority | int | 是 | 匹配优先级 |
 | created_at | timestamptz | 是 | 创建时间 |
+
+范围匹配说明：
+
+- 当 `include_children = false` 时，只匹配 `scope_type + scope_code` 对应的范围节点本身。
+- 当 `include_children = true` 时，需要通过 `scope_node` 和 `scope_closure` 判断任务上下文中的范围节点是否为该范围节点的后代。
+- 如果范围层级由企业 MDM、MES、APS 或组织资源服务统一维护，本模块可以不落 `scope_node` / `scope_closure` 实体表，但必须在 Asset Gateway 中接入等价的层级查询能力。
+- `asset_scope` 只表达资产声明的适用范围，不负责维护范围上下级关系。
 
 #### asset_permission：资产权限表
 
