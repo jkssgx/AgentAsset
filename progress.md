@@ -32,6 +32,7 @@
 - 在 `asset_permission` 表后补充 `subject_type + subject_id` 权限主体说明，明确用户、角色、组织和 Agent 授权主体的表达方式。
 - 在 `asset_operation_log` 表后补充 `object_id` 与 `asset_id` 的对象归属说明，明确精确操作对象与资产聚合索引的区别。
 - 扩展 `tool_asset_detail` 设计，新增 `tool_endpoint_type` 枚举并支持 `python_script`，补充脚本引用、入口函数、运行时、依赖、沙箱和输入输出约束说明。
+- 在 `asset_candidate` 表后补充候选版本设计说明，明确首期不单独设计候选版本表和类型扩展表，以及后续可扩展 `asset_candidate_revision` 的触发条件。
 
 ## 后续规划
 
