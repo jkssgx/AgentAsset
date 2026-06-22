@@ -309,6 +309,7 @@ sequenceDiagram
 - 所有关键动作都需要保留操作者、时间、前后状态和原因。
 - 资产适用范围和权限默认按资产级配置管理；当新版本调整范围或权限时，需要记录版本快照，支持历史任务回放和审计。
 - 审批对象采用多态引用，不做数据库外键约束；由业务服务校验对象存在性、对象状态和审批类型匹配关系。
+- 治理策略与治理校验结果分离：`governance_policy` 定义要检查什么，`policy_check_record` 记录一次校验结果，`policy_check_hit` 记录本次命中的策略明细。
 
 ### 4.2 核心实体关系
 
@@ -323,6 +324,7 @@ erDiagram
     asset ||--o{ asset_retrieval_record : retrieved_by
     asset ||--o{ asset_usage_record : referenced_by
     asset ||--o{ validation_run : validated_by
+    asset ||--o{ governance_policy : governed_by
     asset_version ||--o| rule_asset_detail : extends
     asset_version ||--o| workflow_asset_detail : extends
     asset_version ||--o| tool_asset_detail : extends
@@ -334,6 +336,8 @@ erDiagram
     agent_task_trace ||--o{ asset_retrieval_record : retrieves
     agent_task_trace ||--o{ tool_call_record : invokes
     agent_task_trace ||--o{ policy_check_record : checks
+    policy_check_record ||--o{ policy_check_hit : hits
+    governance_policy ||--o{ policy_check_hit : matched_by
     validation_run ||--o{ asset_validation_result : contains
     approval_instance ||--o{ approval_step : contains
     scope_node ||--o{ scope_closure : ancestor
@@ -359,6 +363,8 @@ erDiagram
 | task_result | `accepted`、`adjusted`、`rejected`、`pending`、`unknown` | 任务建议结果 |
 | tool_level | `read`、`analyze`、`suggest`、`apply`、`execute` | 工具能力等级 |
 | tool_endpoint_type | `http`、`rpc`、`sql`、`message`、`internal_function`、`python_script`、`shell_command` | 工具端点类型 |
+| governance_policy_type | `permission`、`scope`、`tool_call`、`writeback`、`approval`、`risk`、`data_access`、`human_checkpoint` | 治理策略类型 |
+| governance_effect | `allow`、`deny`、`require_approval`、`warn` | 治理策略效果 |
 | relation_type | `depends_on`、`uses_tool`、`references_case`、`evaluated_by`、`supersedes`、`conflicts_with`、`similar_to` | 资产关系类型 |
 | operation_type | `create`、`update`、`submit_validation`、`submit_approval`、`publish`、`disable`、`deprecate`、`rollback`、`reject`、`convert_candidate` | 资产操作类型 |
 | retrieval_status | `retrieved`、`selected`、`discarded` | 资产检索结果状态 |
@@ -984,9 +990,43 @@ Python 脚本工具配置示例：
 | started_at | timestamptz | 是 | 开始时间 |
 | finished_at | timestamptz | 否 | 结束时间 |
 
+#### governance_policy：治理策略表
+
+该表定义运行时治理检查项，用于表达“什么动作在什么条件下允许、拒绝、警告或需要审批”。它可以是全局策略，也可以绑定到某个资产或某个资产版本，例如工具写回策略、跨车间调拨审批策略、敏感数据访问策略、工作流人工确认策略。该表与 `asset` / `asset_version` 是可选关联关系，不强制归属于资产版本，以便支持全局策略和跨资产策略。
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| id | uuid | 是 | 治理策略 ID |
+| policy_code | varchar(128) | 是 | 策略编码 |
+| name | varchar(200) | 是 | 策略名称 |
+| policy_type | varchar(32) | 是 | 策略类型，取值见 `governance_policy_type` 枚举 |
+| action_type | varchar(64) | 是 | 适用动作类型，例如 `tool_call`、`plan_writeback`、`cross_workshop_transfer` |
+| condition_json | jsonb | 否 | 触发条件 |
+| effect | varchar(32) | 是 | 策略效果，取值见 `governance_effect` 枚举 |
+| risk_level | varchar(16) | 否 | 命中后的风险等级 |
+| required_approval_roles | jsonb | 否 | 需要审批的角色 |
+| scope_json | jsonb | 否 | 策略适用范围 |
+| linked_asset_id | uuid | 否 | 绑定资产 ID；为空表示不绑定具体资产 |
+| linked_asset_version_id | uuid | 否 | 绑定资产版本 ID；为空表示不绑定具体版本 |
+| priority | int | 是 | 策略优先级 |
+| enabled | boolean | 是 | 是否启用 |
+| effective_from | timestamptz | 否 | 生效开始时间 |
+| effective_to | timestamptz | 否 | 生效结束时间 |
+| created_by | uuid | 是 | 创建人 |
+| created_at | timestamptz | 是 | 创建时间 |
+| updated_at | timestamptz | 是 | 更新时间 |
+
+关系说明：
+
+- `linked_asset_id` 和 `linked_asset_version_id` 都为空时，表示全局策略。
+- `linked_asset_id` 有值、`linked_asset_version_id` 为空时，表示绑定某个资产，默认适用于该资产所有版本。
+- `linked_asset_id` 和 `linked_asset_version_id` 都有值时，表示绑定某个资产的指定版本。
+- 不建议出现 `linked_asset_id` 为空但 `linked_asset_version_id` 有值的记录，因为版本必须归属于某个资产。
+- 治理策略定义检查规则，`policy_check_record` 记录一次校验结论，`policy_check_hit` 记录本次具体命中了哪些策略。
+
 #### policy_check_record：治理校验记录表
 
-该表记录 Agent 在执行高风险动作、调用工具、生成方案或写回业务系统前的治理校验结果。它保存动作上下文、是否允许、风险等级、命中的限制规则、所需审批角色和下一步动作。该表是“治理优先于自动化”的落地证据，能证明 Agent 的行为经过了权限、风险和规则边界检查。
+该表记录 Agent 在执行高风险动作、调用工具、生成方案或写回业务系统前的治理校验结果。它保存动作上下文、是否允许、风险等级、命中的治理策略摘要、所需审批角色和下一步动作。该表是“治理优先于自动化”的落地证据，能证明 Agent 的行为经过了权限、范围、工具、写回、审批和风险边界检查。
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
@@ -1001,7 +1041,22 @@ Python 脚本工具配置示例：
 | required_approval_roles | jsonb | 否 | 需要审批的角色 |
 | approval_instance_id | uuid | 否 | 已创建或关联的审批实例 ID |
 | next_action | varchar(64) | 否 | 下一步动作，例如 `submit_approval`、`block`、`continue` |
-| blocked_rules | jsonb | 否 | 命中的禁止规则 |
+| matched_policy_summary | jsonb | 否 | 命中策略摘要，详细命中项见 `policy_check_hit` |
+| created_at | timestamptz | 是 | 创建时间 |
+
+#### policy_check_hit：治理策略命中明细表
+
+该表记录一次治理校验中命中的具体策略。一个 `policy_check_record` 可能命中多条 `governance_policy`，例如同时命中“工具写回需要审批”和“跨车间调拨需要生产经理审批”。拆出明细表后，可以追踪每条策略对最终决策的影响，也方便统计哪些治理策略经常拦截、警告或触发审批。
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| id | uuid | 是 | 命中明细 ID |
+| policy_check_id | uuid | 是 | 治理校验记录 ID |
+| governance_policy_id | uuid | 是 | 命中的治理策略 ID |
+| effect | varchar(32) | 是 | 本次命中效果 |
+| risk_level | varchar(16) | 否 | 本次命中风险等级 |
+| decision_reason | text | 否 | 命中原因 |
+| required_approval_roles | jsonb | 否 | 本策略要求的审批角色 |
 | created_at | timestamptz | 是 | 创建时间 |
 
 治理校验返回示例：
@@ -1014,7 +1069,14 @@ Python 脚本工具配置示例：
   "decision_reason": "跨车间调拨会影响已锁定计划，必须经过计划主管和生产经理审批。",
   "required_approval_roles": ["plan_supervisor", "production_manager"],
   "approval_instance_id": null,
-  "next_action": "create_plan_change_request"
+  "next_action": "create_plan_change_request",
+  "matched_policy_summary": [
+    {
+      "policy_code": "POLICY-CROSS-WORKSHOP-APPROVAL",
+      "effect": "require_approval",
+      "reason": "跨车间调拨必须经过计划主管和生产经理审批"
+    }
+  ]
 }
 ```
 
@@ -1324,7 +1386,14 @@ Python 脚本工具配置示例：
   "reason": "计划写回属于高风险动作，需要计划主管审批。",
   "required_approval_roles": ["plan_supervisor"],
   "approval_instance_id": null,
-  "next_action": "submit_approval"
+  "next_action": "submit_approval",
+  "matched_policy_summary": [
+    {
+      "policy_code": "POLICY-PLAN-WRITEBACK-APPROVAL",
+      "effect": "require_approval",
+      "reason": "计划写回动作需要计划主管审批"
+    }
+  ]
 }
 ```
 

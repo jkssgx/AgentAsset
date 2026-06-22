@@ -33,6 +33,7 @@
 - 在 `asset_operation_log` 表后补充 `object_id` 与 `asset_id` 的对象归属说明，明确精确操作对象与资产聚合索引的区别。
 - 扩展 `tool_asset_detail` 设计，新增 `tool_endpoint_type` 枚举并支持 `python_script`，补充脚本引用、入口函数、运行时、依赖、沙箱和输入输出约束说明。
 - 在 `asset_candidate` 表后补充候选版本设计说明，明确首期不单独设计候选版本表和类型扩展表，以及后续可扩展 `asset_candidate_revision` 的触发条件。
+- 新增 `governance_policy` 和 `policy_check_hit` 设计，明确治理策略与资产/资产版本的可选关联关系，并将 `policy_check_record` 定位为一次治理校验结果记录。
 
 ## 后续规划
 
