@@ -351,11 +351,14 @@ erDiagram
 | source_type | `manual`、`upload`、`system_sync`、`agent_trace`、`review_meeting`、`api_import` | 资产来源 |
 | permission_action | `view`、`edit`、`approve`、`agent_read`、`agent_suggest`、`agent_apply`、`agent_execute` | 权限动作 |
 | scope_type | `org`、`factory`、`workshop`、`line`、`workstation`、`equipment`、`product_family`、`product`、`process`、`customer_type`、`scenario` | 资产适用范围类型 |
+| evidence_type | `task_trace`、`asset_usage`、`tool_call`、`policy_check`、`expert_review`、`approval_record`、`system_record`、`validation_case`、`file`、`manual_note`、`external_reference` | 证据业务类型 |
+| evidence_ref_type | `task_trace`、`usage_record`、`tool_call`、`policy_check`、`validation_run`、`approval_instance`、`file`、`system_record`、`external_url`、`manual_note` | 证据引用对象类型 |
 | usage_role | `context`、`tool`、`policy`、`case_reference`、`metric_eval`、`skill_runtime` | Agent 使用资产的方式 |
 | validation_status | `not_started`、`running`、`passed`、`failed`、`warning`、`cancelled` | 验证状态 |
 | approval_status | `pending`、`approved`、`rejected`、`withdrawn`、`cancelled` | 审批状态 |
 | task_result | `accepted`、`adjusted`、`rejected`、`pending`、`unknown` | 任务建议结果 |
 | tool_level | `read`、`analyze`、`suggest`、`apply`、`execute` | 工具能力等级 |
+| tool_endpoint_type | `http`、`rpc`、`sql`、`message`、`internal_function`、`python_script`、`shell_command` | 工具端点类型 |
 | relation_type | `depends_on`、`uses_tool`、`references_case`、`evaluated_by`、`supersedes`、`conflicts_with`、`similar_to` | 资产关系类型 |
 | operation_type | `create`、`update`、`submit_validation`、`submit_approval`、`publish`、`disable`、`deprecate`、`rollback`、`reject`、`convert_candidate` | 资产操作类型 |
 | retrieval_status | `retrieved`、`selected`、`discarded` | 资产检索结果状态 |
@@ -532,6 +535,15 @@ erDiagram
 | created_by | uuid | 是 | 创建人 |
 | created_at | timestamptz | 是 | 创建时间 |
 
+权限主体说明：
+
+- `subject_type + subject_id` 用于统一表达“权限授予给谁”。
+- `subject_type = user` 时，`subject_id` 为具体用户 ID。
+- `subject_type = role` 时，`subject_id` 为角色编码，例如 `plan_supervisor`。
+- `subject_type = org` 时，`subject_id` 为组织或范围编码，例如 `factory-SZ01`。
+- `subject_type = agent` 时，`subject_id` 为 Agent 标识，例如 `dispatch-agent`。
+- 权限判断时，系统需要展开当前用户或 Agent 所属的用户、角色、组织、Agent 主体集合，再匹配 `action` 和 `effect`；若同时命中 `allow` 和 `deny`，建议按 `deny` 优先处理。
+
 #### asset_relation：资产关系表
 
 该表用于建立资产之间的显式关系，解决资产不是孤立对象的问题。例如工作流会引用工具接口，案例会引用规则，指标会评估某类工作流，新规则可能替代旧规则，也可能与既有规则存在冲突。该表可支撑影响分析、候选资产合并、资产下线前依赖检查、相似资产去重和知识图谱式浏览。
@@ -575,6 +587,14 @@ erDiagram
 | operator_type | varchar(32) | 是 | `user`、`agent`、`system` |
 | created_at | timestamptz | 是 | 操作时间 |
 
+对象归属说明：
+
+- `object_id` 表示本次操作直接作用的对象，是操作日志的精确指针。
+- `asset_id` 表示该日志最终归属到哪一个正式资产，主要用于资产详情页聚合完整时间线。
+- 当 `object_type = asset` 时，`object_id` 和 `asset_id` 通常相同。
+- 当 `object_type = asset_version` 时，`object_id` 是版本 ID，`asset_id` 是该版本所属资产 ID。
+- 当 `object_type = candidate` 时，若候选已转正，`asset_id` 可填转正后的资产 ID；若候选未转正，`asset_id` 可为空。
+
 建议索引：
 
 | 索引 | 字段 | 用途 |
@@ -584,21 +604,29 @@ erDiagram
 
 #### asset_evidence：资产证据链表
 
-该表用于保存正式资产的证据链，说明资产为什么可信、来自哪里、经过哪些验证或专家确认。证据可以来自任务轨迹、系统记录、上传文件、专家评审、验证样例等。资产详情页中的“证据链”区域、审批人判断资产是否可发布、以及后续复盘某条规则为何生效，都需要依赖该表。
+该表用于保存正式资产的证据链，说明资产为什么可信、来自哪里、经过哪些验证或专家确认。证据可以来自任务轨迹、资产使用记录、工具调用、治理校验、验证任务、审批记录、系统记录、上传文件或外部链接。资产详情页中的“证据链”区域、审批人判断资产是否可发布、以及后续复盘某条规则为何生效，都需要依赖该表。
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | id | uuid | 是 | 唯一标识 |
 | asset_id | uuid | 是 | 资产 ID |
 | asset_version_id | uuid | 否 | 版本 ID |
-| evidence_type | varchar(32) | 是 | `task_trace`、`file`、`expert_review`、`system_record`、`validation_case` |
+| evidence_type | varchar(32) | 是 | 证据业务类型，取值见 `evidence_type` 枚举 |
 | title | varchar(200) | 是 | 证据标题 |
+| ref_type | varchar(32) | 是 | 引用对象类型，取值见 `evidence_ref_type` 枚举 |
 | ref_id | varchar(128) | 否 | 关联对象 ID |
 | ref_url | text | 否 | 附件或外部链接 |
 | summary | text | 否 | 证据摘要 |
 | confidence_score | numeric(5,2) | 否 | 可信度评分 |
 | created_by | uuid | 是 | 创建人 |
 | created_at | timestamptz | 是 | 创建时间 |
+
+说明：
+
+- `evidence_type` 表示证据的业务分类，例如任务轨迹证据、专家评审证据、系统记录证据。
+- `ref_type` 表示 `ref_id` 指向哪类对象，例如 `task_trace`、`validation_run`、`approval_instance` 或 `file`。
+- `ref_id` 用于结构化关联内部或外部对象；`ref_url` 用于跳转访问文件、页面或外部系统链接。
+- 当证据仅为人工备注且没有可关联对象时，`ref_type` 可写 `manual_note`，`ref_id` 可为空。
 
 ### 4.5 类型扩展表
 
@@ -683,7 +711,7 @@ erDiagram
 
 #### tool_asset_detail：工具接口资产详情
 
-该表保存 Agent 可调用工具或业务系统接口的治理信息，包括所属系统、接口类型、入参出参、超时重试、写回限制和审计要求。它不是直接保存密钥或敏感连接信息，而是保存密钥引用和调用策略。Agent 调用 MES、ERP、APS、规则校验器或审批服务前，应通过该表确认工具等级和调用边界。
+该表保存 Agent 可调用工具或业务系统接口的治理信息，包括所属系统、接口类型、入参出参、超时重试、写回限制和审计要求。工具既可以是 HTTP/RPC/SQL/消息等系统接口，也可以是平台托管的 Python 脚本、内部函数或受控命令。它不是直接保存密钥或敏感连接信息，而是保存密钥引用、脚本引用和调用策略。Agent 调用 MES、ERP、APS、规则校验器、Python 分析脚本或审批服务前，应通过该表确认工具等级、运行环境和调用边界。
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
@@ -691,8 +719,8 @@ erDiagram
 | tool_code | varchar(128) | 是 | 工具编码 |
 | tool_level | varchar(32) | 是 | 工具能力等级 |
 | system_name | varchar(64) | 是 | 所属系统，例如 MES、ERP、APS |
-| endpoint_type | varchar(32) | 是 | `http`、`rpc`、`sql`、`message`、`internal_function` |
-| endpoint_config | jsonb | 是 | 端点配置，敏感字段只保存密钥引用 |
+| endpoint_type | varchar(32) | 是 | 工具端点类型，取值见 `tool_endpoint_type` 枚举 |
+| endpoint_config | jsonb | 是 | 端点配置；敏感字段只保存密钥引用，脚本类工具只保存脚本资产引用或受控路径 |
 | input_schema | jsonb | 是 | 入参结构 |
 | output_schema | jsonb | 是 | 出参结构 |
 | timeout_ms | int | 是 | 超时时间 |
@@ -700,7 +728,7 @@ erDiagram
 | writeback_policy | jsonb | 否 | 写回限制 |
 | audit_required | boolean | 是 | 是否强制审计 |
 
-工具配置示例：
+HTTP 工具配置示例：
 
 ```json
 {
@@ -713,6 +741,34 @@ erDiagram
   }
 }
 ```
+
+Python 脚本工具配置示例：
+
+```json
+{
+  "script_ref_type": "asset_file",
+  "script_ref_id": "file-uuid-reschedule-impact-py",
+  "entrypoint": "main",
+  "runtime": "python3.11",
+  "dependency_profile": "dispatch-analysis-v1",
+  "sandbox": {
+    "network": "deny",
+    "filesystem": "read_only",
+    "allowed_mounts": ["task_context", "tmp_output"],
+    "max_memory_mb": 512,
+    "max_cpu_seconds": 30
+  },
+  "input_mode": "json",
+  "output_mode": "json"
+}
+```
+
+脚本类工具说明：
+
+- `python_script` 适用于影响分析、规则校验、数据清洗、指标计算等可由脚本完成的能力。
+- 脚本文件本身建议由文件资产、对象存储或 Skill Projection Service 管理，`endpoint_config` 只保存引用，不直接存放大段脚本源码。
+- 脚本执行必须经过沙箱、依赖白名单、超时和资源限制控制；涉及写回或外部网络访问时，应通过 `tool_level`、`writeback_policy` 和 `check_policy` 额外治理。
+- 输入输出必须受 `input_schema` 和 `output_schema` 约束，避免 Agent 传入任意结构或脚本返回不可解析内容。
 
 #### case_asset_detail：案例经验资产详情
 
@@ -783,7 +839,7 @@ erDiagram
 | --- | --- | --- | --- |
 | id | uuid | 是 | 唯一标识 |
 | candidate_id | uuid | 是 | 候选资产 ID |
-| evidence_type | varchar(32) | 是 | 证据类型 |
+| evidence_type | varchar(32) | 是 | 证据业务类型，取值见 `evidence_type` 枚举 |
 | ref_type | varchar(32) | 是 | 来源对象类型：`task_trace`、`usage_record`、`file`、`manual_note` |
 | ref_id | varchar(128) | 否 | 来源对象 ID |
 | excerpt | text | 否 | 证据摘录 |

@@ -27,6 +27,11 @@
 - 补充 `SDD.md` 中每张数据表的作用说明，明确各表在资产生命周期、版本治理、范围权限、证据链、候选沉淀、Agent 审计、验证审批和价值度量中的职责。
 - 补充 `asset_version_status` 枚举和资产版本状态说明，明确资产整体状态与资产版本状态的边界。
 - 补充 `scope_type` 枚举，并新增 `scope_node`、`scope_closure` 范围层级模型，明确 `asset_scope.include_children` 需要依赖范围层级表或外部主数据服务才能生效。
+- 为 `asset_evidence` 增加 `ref_type` 字段和 `evidence_ref_type` 枚举，明确正式资产证据链中 `ref_id` 指向的对象类型。
+- 补充 `evidence_type` 枚举，并统一 `asset_evidence` 与 `candidate_evidence` 中证据业务类型字段的说明。
+- 在 `asset_permission` 表后补充 `subject_type + subject_id` 权限主体说明，明确用户、角色、组织和 Agent 授权主体的表达方式。
+- 在 `asset_operation_log` 表后补充 `object_id` 与 `asset_id` 的对象归属说明，明确精确操作对象与资产聚合索引的区别。
+- 扩展 `tool_asset_detail` 设计，新增 `tool_endpoint_type` 枚举并支持 `python_script`，补充脚本引用、入口函数、运行时、依赖、沙箱和输入输出约束说明。
 
 ## 后续规划
 
