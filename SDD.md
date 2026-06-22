@@ -1193,27 +1193,117 @@ Python 脚本工具配置示例：
 
 ### 4.10 前端页面数据结构
 
-#### 资产列表行
+本节定义前端页面所需的数据结构。字段命名保持 snake_case，便于直接映射后端接口；前端组件内部可再转换为 camelCase。
+
+#### 资产工作台页面
 
 ```json
 {
-  "id": "asset-uuid",
-  "asset_code": "AST-WF-202606-0003",
-  "name": "设备故障后局部重排工作流",
-  "asset_type": "workflow",
-  "status": "published",
-  "risk_level": "medium",
-  "version_name": "v1.3",
-  "owner_name": "张计划",
-  "scope_text": "苏州一厂 / 总装一线",
-  "usage_count": 128,
-  "acceptance_rate": 0.74,
-  "last_used_at": "2026-06-18T09:42:00+08:00",
-  "tags": ["设备故障", "动态重排"]
+  "overview": {
+    "asset_total": 326,
+    "published_count": 218,
+    "pending_approval_count": 17,
+    "candidate_count": 42,
+    "high_risk_count": 9,
+    "unused_30d_count": 31
+  },
+  "status_distribution": [
+    { "status": "published", "count": 218 },
+    { "status": "pending_approval", "count": 17 },
+    { "status": "draft", "count": 54 }
+  ],
+  "type_distribution": [
+    { "asset_type": "rule", "count": 96 },
+    { "asset_type": "workflow", "count": 38 },
+    { "asset_type": "tool", "count": 45 }
+  ],
+  "todo_items": [
+    {
+      "todo_type": "approval",
+      "title": "设备故障重排工作流 v1.4 待审批",
+      "object_type": "asset_version",
+      "object_id": "version-uuid",
+      "risk_level": "medium",
+      "created_at": "2026-06-22T10:15:00+08:00"
+    }
+  ],
+  "candidate_queue": [
+    {
+      "candidate_id": "candidate-uuid",
+      "title": "高价值急单插入时冻结低优先级尾单",
+      "asset_type": "rule",
+      "evidence_count": 4,
+      "confidence_score": 86.5,
+      "risk_level": "medium",
+      "status": "pending_validation"
+    }
+  ],
+  "risk_alerts": [
+    {
+      "alert_type": "expired_soon",
+      "asset_id": "asset-uuid",
+      "asset_name": "跨车间调拨审批规则",
+      "message": "该规则将在 7 天后到期"
+    }
+  ]
 }
 ```
 
-#### 资产详情响应
+#### 资产台账页面
+
+用于资产列表、筛选、排序、分页和批量操作。
+
+```json
+{
+  "filters": {
+    "keyword": "设备故障",
+    "asset_types": ["rule", "workflow"],
+    "statuses": ["published", "pending_approval"],
+    "risk_levels": ["medium", "high"],
+    "scope": {
+      "scope_type": "line",
+      "scope_code": "LINE-A1",
+      "include_children": true
+    },
+    "owner_user_id": "user-uuid",
+    "tags": ["动态重排"],
+    "last_used_days": 30
+  },
+  "pagination": {
+    "page": 1,
+    "page_size": 20,
+    "total": 326
+  },
+  "sort": {
+    "field": "updated_at",
+    "order": "desc"
+  },
+  "rows": [
+    {
+      "id": "asset-uuid",
+      "asset_code": "AST-WF-202606-0003",
+      "name": "设备故障后局部重排工作流",
+      "asset_type": "workflow",
+      "status": "published",
+      "risk_level": "medium",
+      "version_name": "v1.3",
+      "owner_name": "张计划",
+      "scope_text": "苏州一厂 / 总装一线",
+      "usage_count": 128,
+      "acceptance_rate": 0.74,
+      "last_used_at": "2026-06-18T09:42:00+08:00",
+      "updated_at": "2026-06-20T16:20:00+08:00",
+      "tags": ["设备故障", "动态重排"],
+      "available_actions": ["view", "new_version", "disable"]
+    }
+  ],
+  "batch_actions": ["batch_tag", "batch_owner_change", "batch_disable"]
+}
+```
+
+#### 资产详情页面
+
+用于资产详情页，包括基础信息、当前版本、范围权限、证据链、版本历史、使用记录和操作按钮。
 
 ```json
 {
@@ -1224,11 +1314,21 @@ Python 脚本工具配置示例：
     "asset_type": "workflow",
     "status": "published",
     "risk_level": "medium",
-    "summary": "设备短时故障时，指导智能体识别影响范围并生成局部重排方案。"
+    "summary": "设备短时故障时，指导智能体识别影响范围并生成局部重排方案。",
+    "owner": {
+      "user_id": "user-uuid",
+      "user_name": "张计划"
+    },
+    "tags": ["设备故障", "动态重排"],
+    "effective_from": "2026-06-01T00:00:00+08:00",
+    "effective_to": null
   },
   "current_version": {
     "id": "version-uuid",
+    "version_no": 3,
     "version_name": "v1.3",
+    "status": "published",
+    "validation_status": "passed",
     "content_text": "当关键设备预计停机超过 30 分钟时，先进行影响范围识别，再判断局部重排或全局重排。",
     "content_json": {
       "trigger_condition": {
@@ -1242,61 +1342,395 @@ Python 脚本工具配置示例：
     {
       "scope_type": "line",
       "scope_code": "LINE-A1",
-      "scope_name": "总装一线"
-    }
-  ],
-  "governance": {
-    "permissions": ["agent_read", "agent_suggest", "agent_apply"],
-    "approval_required_actions": ["plan_writeback", "cross_workshop_transfer"],
-    "effective_from": "2026-06-01T00:00:00+08:00",
-    "effective_to": null
-  },
-  "usage_summary": {
-    "usage_count": 128,
-    "accepted_count": 95,
-    "adjusted_count": 21,
-    "rejected_count": 12
-  }
-}
-```
-
-#### 新建资产提交结构
-
-```json
-{
-  "name": "高价值急单插入优先级规则",
-  "asset_type": "rule",
-  "summary": "S 级客户急单延期风险超过阈值时提高排程优先级。",
-  "risk_level": "medium",
-  "source_type": "manual",
-  "scopes": [
-    {
-      "scope_type": "factory",
-      "scope_code": "SZ01",
+      "scope_name": "总装一线",
       "include_children": true
     }
   ],
-  "content_text": "S 级客户急单预计延期超过 8 小时时，应优先评估插入计划。",
-  "content_json": {
-    "rule_category": "priority",
-    "trigger_condition": {
-      "customer_level": "S",
-      "order_type": "urgent",
-      "delay_hours": { "gte": 8 }
-    },
-    "constraint_expression": {
-      "priority_boost": 30
-    },
-    "violation_action": "require_approval"
-  },
   "permissions": [
     {
       "subject_type": "agent",
       "subject_id": "dispatch-agent",
-      "action": "agent_read",
+      "subject_name": "调度智能体",
+      "action": "agent_apply",
       "effect": "allow"
     }
+  ],
+  "relations": [
+    {
+      "relation_type": "uses_tool",
+      "target_asset_id": "tool-asset-uuid",
+      "target_asset_name": "APS 局部重排求解器"
+    }
+  ],
+  "evidences": [
+    {
+      "id": "evidence-uuid",
+      "evidence_type": "validation_case",
+      "ref_type": "validation_run",
+      "title": "故障重排回放验证",
+      "summary": "10 个历史任务回放通过 9 个"
+    }
+  ],
+  "version_history": [
+    {
+      "version_id": "version-uuid",
+      "version_name": "v1.3",
+      "status": "published",
+      "change_summary": "补充跨车间审批点",
+      "published_at": "2026-06-20T16:20:00+08:00"
+    }
+  ],
+  "usage_summary": {
+    "usage_count": 128,
+    "accepted_count": 95,
+    "adjusted_count": 21,
+    "rejected_count": 12,
+    "policy_block_count": 6
+  },
+  "available_actions": ["edit_draft", "new_version", "submit_disable", "view_trace"]
+}
+```
+
+#### 新建/编辑资产页面
+
+用于资产创建向导和版本编辑。`content_schema` 用于动态渲染不同资产类型的表单。
+
+```json
+{
+  "mode": "create",
+  "step": "governance_config",
+  "draft": {
+    "asset_id": null,
+    "asset_version_id": null,
+    "name": "高价值急单插入优先级规则",
+    "asset_type": "rule",
+    "summary": "S 级客户急单延期风险超过阈值时提高排程优先级。",
+    "risk_level": "medium",
+    "source_type": "manual",
+    "scopes": [
+      {
+        "scope_type": "factory",
+        "scope_code": "SZ01",
+        "scope_name": "苏州一厂",
+        "include_children": true
+      }
+    ],
+    "content_text": "S 级客户急单预计延期超过 8 小时时，应优先评估插入计划。",
+    "content_json": {
+      "rule_category": "priority",
+      "trigger_condition": {
+        "customer_level": "S",
+        "order_type": "urgent",
+        "delay_hours": { "gte": 8 }
+      },
+      "constraint_expression": {
+        "priority_boost": 30
+      },
+      "violation_action": "require_approval"
+    },
+    "permissions": [
+      {
+        "subject_type": "agent",
+        "subject_id": "dispatch-agent",
+        "action": "agent_read",
+        "effect": "allow"
+      }
+    ],
+    "evidences": []
+  },
+  "content_schema": {
+    "required": ["rule_category", "trigger_condition", "violation_action"],
+    "properties": {
+      "rule_category": {
+        "type": "string",
+        "enum": ["hard_constraint", "soft_constraint", "priority", "strategy"]
+      }
+    }
+  },
+  "ai_structure_result": {
+    "status": "generated",
+    "confidence_score": 82.3,
+    "warnings": ["未检测到明确的有效期"]
+  },
+  "validation_preview": {
+    "schema_check": "passed",
+    "scope_check": "warning",
+    "conflict_check": "not_started"
+  },
+  "available_actions": ["save_draft", "run_validation", "submit_approval"]
+}
+```
+
+#### 候选资产池页面
+
+用于候选资产列表、详情、证据查看、转草稿、合并和驳回。
+
+```json
+{
+  "filters": {
+    "asset_types": ["rule", "case"],
+    "statuses": ["new", "pending_validation"],
+    "risk_levels": ["low", "medium"],
+    "source_type": "agent_trace",
+    "keyword": "急单"
+  },
+  "rows": [
+    {
+      "candidate_id": "candidate-uuid",
+      "candidate_code": "CAND-RULE-202606-0008",
+      "title": "高价值急单插入时冻结低优先级尾单",
+      "asset_type": "rule",
+      "status": "pending_validation",
+      "risk_level": "medium",
+      "confidence_score": 86.5,
+      "evidence_count": 4,
+      "duplicate_asset_id": "asset-uuid",
+      "created_by_agent_id": "dispatch-agent",
+      "created_at": "2026-06-22T09:30:00+08:00"
+    }
+  ],
+  "detail": {
+    "candidate_id": "candidate-uuid",
+    "proposed_content_json": {
+      "rule_category": "priority",
+      "trigger_condition": {
+        "customer_level": "S",
+        "delay_hours": { "gte": 8 }
+      }
+    },
+    "evidences": [
+      {
+        "evidence_type": "task_trace",
+        "ref_type": "task_trace",
+        "ref_id": "TASK-20260618-0007",
+        "excerpt": "计划员采纳了冻结低优先级尾单的方案",
+        "weight": 0.8
+      }
+    ],
+    "available_actions": ["convert_to_draft", "merge_to_asset", "reject", "request_more_evidence"]
+  }
+}
+```
+
+#### 验证与审批页面
+
+用于待验证、待审批、审批记录和验证详情。
+
+```json
+{
+  "validation_queue": [
+    {
+      "validation_run_id": "validation-run-uuid",
+      "object_type": "asset_version",
+      "object_id": "version-uuid",
+      "asset_name": "设备故障后局部重排工作流",
+      "status": "running",
+      "overall_score": null,
+      "started_at": "2026-06-22T10:20:00+08:00"
+    }
+  ],
+  "approval_queue": [
+    {
+      "approval_instance_id": "approval-uuid",
+      "object_type": "asset_version",
+      "object_id": "version-uuid",
+      "approval_type": "publish",
+      "title": "发布设备故障后局部重排工作流 v1.4",
+      "risk_level": "medium",
+      "submitter_name": "张计划",
+      "submitted_at": "2026-06-22T11:00:00+08:00",
+      "current_step": 1
+    }
+  ],
+  "approval_detail": {
+    "approval_instance_id": "approval-uuid",
+    "reason": "新增跨车间审批点后申请发布",
+    "steps": [
+      {
+        "step_no": 1,
+        "approver_type": "role",
+        "approver_id": "plan_supervisor",
+        "status": "pending",
+        "comment": null
+      }
+    ],
+    "validation_results": [
+      {
+        "validation_type": "conflict_check",
+        "status": "passed",
+        "score": 92.5,
+        "result_summary": "未发现高优先级规则冲突"
+      }
+    ],
+    "available_actions": ["approve", "reject", "return_to_edit"]
+  }
+}
+```
+
+#### Agent 使用记录页面
+
+用于展示任务轨迹、资产检索、资产引用、治理校验和工具调用。
+
+```json
+{
+  "filters": {
+    "task_type": "device_failure_reschedule",
+    "agent_id": "dispatch-agent",
+    "asset_type": "workflow",
+    "result_status": "accepted",
+    "time_range": ["2026-06-01", "2026-06-22"]
+  },
+  "task_rows": [
+    {
+      "task_trace_id": "task-uuid",
+      "task_code": "TASK-20260618-0007",
+      "task_type": "device_failure_reschedule",
+      "agent_id": "dispatch-agent",
+      "user_name": "李计划",
+      "result_status": "accepted",
+      "asset_usage_count": 6,
+      "tool_call_count": 3,
+      "policy_check_count": 2,
+      "started_at": "2026-06-18T08:30:00+08:00"
+    }
+  ],
+  "task_detail": {
+    "task_trace_id": "task-uuid",
+    "task_context": {
+      "factory": "SZ01",
+      "line": "LINE-A1",
+      "scenario": "device_failure_reschedule"
+    },
+    "retrieval_records": [
+      {
+        "asset_id": "asset-uuid",
+        "asset_name": "设备故障后局部重排工作流",
+        "rank_no": 1,
+        "retrieval_score": 0.9132,
+        "retrieval_status": "selected"
+      }
+    ],
+    "usage_records": [
+      {
+        "asset_id": "asset-uuid",
+        "usage_role": "context",
+        "used_in_step": "方案生成",
+        "influence_summary": "确定先局部重排再判断是否全局重排"
+      }
+    ],
+    "policy_checks": [
+      {
+        "policy_check_id": "policy-check-uuid",
+        "action_type": "plan_writeback",
+        "allowed": false,
+        "risk_level": "high",
+        "next_action": "submit_approval"
+      }
+    ],
+    "tool_calls": [
+      {
+        "tool_call_id": "tool-call-uuid",
+        "call_name": "run_reschedule_solver",
+        "status": "success",
+        "latency_ms": 1280
+      }
+    ]
+  }
+}
+```
+
+#### 价值分析页面
+
+用于资产价值看板、趋势图、排行和低价值资产识别。
+
+```json
+{
+  "filters": {
+    "time_range": ["2026-06-01", "2026-06-22"],
+    "factory_code": "SZ01",
+    "scenario": "device_failure_reschedule",
+    "asset_types": ["rule", "workflow", "tool"]
+  },
+  "summary": {
+    "usage_count": 1280,
+    "accepted_count": 820,
+    "acceptance_rate": 0.64,
+    "policy_block_count": 96,
+    "candidate_generated_count": 42,
+    "candidate_converted_count": 11
+  },
+  "usage_trend": [
+    {
+      "stat_date": "2026-06-18",
+      "usage_count": 64,
+      "accepted_count": 42,
+      "policy_block_count": 5
+    }
+  ],
+  "asset_rankings": [
+    {
+      "asset_id": "asset-uuid",
+      "asset_name": "设备故障后局部重排工作流",
+      "asset_type": "workflow",
+      "usage_count": 128,
+      "acceptance_rate": 0.74
+    }
+  ],
+  "low_value_assets": [
+    {
+      "asset_id": "asset-unused-uuid",
+      "asset_name": "旧版物料短缺处理规则",
+      "reason": "近 30 天无引用"
+    }
   ]
+}
+```
+
+#### 治理配置页面
+
+用于维护权限、范围字典、审批策略和治理策略。
+
+```json
+{
+  "scope_tree": [
+    {
+      "scope_type": "factory",
+      "scope_code": "SZ01",
+      "scope_name": "苏州一厂",
+      "children": [
+        {
+          "scope_type": "workshop",
+          "scope_code": "WS-A",
+          "scope_name": "总装车间"
+        }
+      ]
+    }
+  ],
+  "policy_rows": [
+    {
+      "governance_policy_id": "policy-uuid",
+      "policy_code": "POLICY-PLAN-WRITEBACK-APPROVAL",
+      "name": "计划写回必须审批",
+      "policy_type": "writeback",
+      "action_type": "plan_writeback",
+      "effect": "require_approval",
+      "risk_level": "high",
+      "enabled": true,
+      "linked_asset_id": null,
+      "linked_asset_version_id": null
+    }
+  ],
+  "permission_rows": [
+    {
+      "asset_id": "asset-uuid",
+      "asset_name": "设备故障后局部重排工作流",
+      "subject_type": "agent",
+      "subject_id": "dispatch-agent",
+      "action": "agent_apply",
+      "effect": "allow"
+    }
+  ],
+  "available_actions": ["create_policy", "edit_policy", "disable_policy", "sync_scope_tree"]
 }
 ```
 

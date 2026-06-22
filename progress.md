@@ -34,6 +34,7 @@
 - 扩展 `tool_asset_detail` 设计，新增 `tool_endpoint_type` 枚举并支持 `python_script`，补充脚本引用、入口函数、运行时、依赖、沙箱和输入输出约束说明。
 - 在 `asset_candidate` 表后补充候选版本设计说明，明确首期不单独设计候选版本表和类型扩展表，以及后续可扩展 `asset_candidate_revision` 的触发条件。
 - 新增 `governance_policy` 和 `policy_check_hit` 设计，明确治理策略与资产/资产版本的可选关联关系，并将 `policy_check_record` 定位为一次治理校验结果记录。
+- 细化 `SDD.md` 中 `4.10 前端页面数据结构`，按资产工作台、资产台账、资产详情、新建编辑、候选资产池、验证审批、Agent 使用记录、价值分析和治理配置页面补充页面级数据结构。
 
 ## 后续规划
 
