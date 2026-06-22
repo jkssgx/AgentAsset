@@ -86,6 +86,42 @@ sequenceDiagram
   -> 旧版本归档，可按权限回滚
 ```
 
+### 1.5 审批退回后重新提交
+
+```text
+待审批资产版本
+  -> 审批人驳回并填写原因
+  -> 系统写入 asset_operation_log
+  -> 资产版本回到草稿或待补充状态
+  -> 负责人修改内容、范围、权限或证据
+  -> 重新提交验证
+  -> 验证通过后重新提交审批
+```
+
+### 1.6 候选资产合并到已有资产
+
+```text
+候选资产
+  -> 系统识别疑似重复资产
+  -> 用户选择合并到已有资产
+  -> 基于已有资产创建新版本草稿
+  -> 候选证据转入资产证据链
+  -> 写入 asset_relation(similar_to / supersedes)
+  -> 提交验证和审批
+  -> 审批通过后候选状态变为 converted
+```
+
+### 1.7 资产停用后的 Agent 缓存失效
+
+```text
+资产停用或废止
+  -> 写入资产操作日志
+  -> 更新资产状态
+  -> 通知 Asset Gateway 刷新可用资产索引
+  -> 通知 Skill Projection Service 移除或更新运行时投影
+  -> Agent 后续任务不再检索或使用该资产
+```
+
 ## 2. 页面信息架构
 
 ```text
@@ -271,6 +307,8 @@ sequenceDiagram
 - Agent 任务引用、工具调用、治理校验、人工反馈必须独立成表，避免只存在日志里。
 - 候选资产与正式资产隔离，只有审批通过后才生成正式资产和正式版本。
 - 所有关键动作都需要保留操作者、时间、前后状态和原因。
+- 资产适用范围和权限默认按资产级配置管理；当新版本调整范围或权限时，需要记录版本快照，支持历史任务回放和审计。
+- 审批对象采用多态引用，不做数据库外键约束；由业务服务校验对象存在性、对象状态和审批类型匹配关系。
 
 ### 4.2 核心实体关系
 
@@ -280,19 +318,24 @@ erDiagram
     asset ||--o{ asset_scope : applies_to
     asset ||--o{ asset_permission : controls
     asset ||--o{ asset_evidence : proven_by
+    asset ||--o{ asset_relation : relates
+    asset ||--o{ asset_operation_log : logs
+    asset ||--o{ asset_retrieval_record : retrieved_by
     asset ||--o{ asset_usage_record : referenced_by
-    asset ||--o{ asset_validation_result : validated_by
-    asset ||--o{ approval_instance : approved_by
+    asset ||--o{ validation_run : validated_by
     asset_version ||--o| rule_asset_detail : extends
     asset_version ||--o| workflow_asset_detail : extends
     asset_version ||--o| tool_asset_detail : extends
     asset_version ||--o| case_asset_detail : extends
     asset_version ||--o| metric_asset_detail : extends
     asset_candidate ||--o{ candidate_evidence : has
-    asset_candidate ||--o{ approval_instance : approved_by
+    asset_candidate ||--o{ validation_run : validated_by
     agent_task_trace ||--o{ asset_usage_record : records
+    agent_task_trace ||--o{ asset_retrieval_record : retrieves
     agent_task_trace ||--o{ tool_call_record : invokes
     agent_task_trace ||--o{ policy_check_record : checks
+    validation_run ||--o{ asset_validation_result : contains
+    approval_instance ||--o{ approval_step : contains
 ```
 
 ### 4.3 枚举字典
@@ -300,7 +343,7 @@ erDiagram
 | 枚举 | 值 | 说明 |
 | --- | --- | --- |
 | asset_type | `rule`、`workflow`、`tool`、`case`、`metric`、`term`、`dataset`、`skill` | 资产类型 |
-| asset_status | `draft`、`candidate`、`pending_validation`、`validating`、`pending_approval`、`published`、`disabled`、`deprecated`、`rejected` | 资产状态 |
+| asset_status | `draft`、`pending_validation`、`validating`、`pending_approval`、`published`、`disabled`、`deprecated`、`rejected` | 正式资产状态；候选状态只存在于 `asset_candidate` |
 | risk_level | `low`、`medium`、`high`、`critical` | 风险等级 |
 | source_type | `manual`、`upload`、`system_sync`、`agent_trace`、`review_meeting`、`api_import` | 资产来源 |
 | permission_action | `view`、`edit`、`approve`、`agent_read`、`agent_suggest`、`agent_apply`、`agent_execute` | 权限动作 |
@@ -309,6 +352,9 @@ erDiagram
 | approval_status | `pending`、`approved`、`rejected`、`withdrawn`、`cancelled` | 审批状态 |
 | task_result | `accepted`、`adjusted`、`rejected`、`pending`、`unknown` | 任务建议结果 |
 | tool_level | `read`、`analyze`、`suggest`、`apply`、`execute` | 工具能力等级 |
+| relation_type | `depends_on`、`uses_tool`、`references_case`、`evaluated_by`、`supersedes`、`conflicts_with`、`similar_to` | 资产关系类型 |
+| operation_type | `create`、`update`、`submit_validation`、`submit_approval`、`publish`、`disable`、`deprecate`、`rollback`、`reject`、`convert_candidate` | 资产操作类型 |
+| retrieval_status | `retrieved`、`selected`、`discarded` | 资产检索结果状态 |
 
 ### 4.4 资产主表
 
@@ -354,6 +400,11 @@ erDiagram
 | idx_asset_last_used | last_used_at | 低活跃资产分析 |
 | idx_asset_tags_gin | tags | 标签检索 |
 
+约束说明：
+
+- `current_version_id` 只能指向当前资产下状态为 `published` 的版本。
+- 候选资产不写入 `asset` 表，只有候选转正成功后才生成正式资产记录。
+
 #### asset_version：资产版本表
 
 保存每个版本的完整内容快照。
@@ -390,6 +441,7 @@ erDiagram
 | --- | --- | --- | --- |
 | id | uuid | 是 | 唯一标识 |
 | asset_id | uuid | 是 | 资产 ID |
+| asset_version_id | uuid | 否 | 版本 ID；为空表示资产级范围，非空表示该版本的范围快照 |
 | scope_type | varchar(32) | 是 | 范围类型：`factory`、`workshop`、`line`、`product_family`、`process`、`customer_type`、`scenario` |
 | scope_code | varchar(128) | 是 | 范围编码 |
 | scope_name | varchar(200) | 否 | 范围名称 |
@@ -405,6 +457,7 @@ erDiagram
 | --- | --- | --- | --- |
 | id | uuid | 是 | 唯一标识 |
 | asset_id | uuid | 是 | 资产 ID |
+| asset_version_id | uuid | 否 | 版本 ID；为空表示资产级权限，非空表示该版本的权限快照 |
 | subject_type | varchar(32) | 是 | 主体类型：`user`、`role`、`org`、`agent` |
 | subject_id | varchar(128) | 是 | 主体 ID |
 | action | varchar(32) | 是 | 权限动作 |
@@ -412,6 +465,56 @@ erDiagram
 | condition_json | jsonb | 否 | 条件，例如仅某工厂、某风险等级以下可用 |
 | created_by | uuid | 是 | 创建人 |
 | created_at | timestamptz | 是 | 创建时间 |
+
+#### asset_relation：资产关系表
+
+保存资产之间的依赖、引用、冲突、替代和相似关系。
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| id | uuid | 是 | 唯一标识 |
+| source_asset_id | uuid | 是 | 源资产 ID |
+| source_asset_version_id | uuid | 否 | 源资产版本 ID |
+| target_asset_id | uuid | 是 | 目标资产 ID |
+| target_asset_version_id | uuid | 否 | 目标资产版本 ID |
+| relation_type | varchar(32) | 是 | 关系类型 |
+| strength | numeric(5,2) | 否 | 关系强度或相似度 |
+| description | text | 否 | 关系说明 |
+| created_by | uuid | 是 | 创建人 |
+| created_at | timestamptz | 是 | 创建时间 |
+
+建议索引：
+
+| 索引 | 字段 | 用途 |
+| --- | --- | --- |
+| idx_asset_relation_source | source_asset_id, relation_type | 查询资产依赖或引用 |
+| idx_asset_relation_target | target_asset_id, relation_type | 反查被哪些资产引用 |
+
+#### asset_operation_log：资产操作日志表
+
+记录资产、资产版本和候选资产的关键状态变化与治理动作。
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| id | uuid | 是 | 操作日志 ID |
+| object_type | varchar(32) | 是 | `asset`、`asset_version`、`candidate` |
+| object_id | uuid | 是 | 操作对象 ID |
+| asset_id | uuid | 否 | 资产 ID，便于按资产聚合查询 |
+| operation_type | varchar(32) | 是 | 操作类型 |
+| from_status | varchar(32) | 否 | 操作前状态 |
+| to_status | varchar(32) | 否 | 操作后状态 |
+| reason | text | 否 | 操作原因 |
+| diff_json | jsonb | 否 | 关键字段变更摘要 |
+| operator_id | uuid | 否 | 操作人；系统或 Agent 操作时可为空 |
+| operator_type | varchar(32) | 是 | `user`、`agent`、`system` |
+| created_at | timestamptz | 是 | 操作时间 |
+
+建议索引：
+
+| 索引 | 字段 | 用途 |
+| --- | --- | --- |
+| idx_asset_operation_object | object_type, object_id, created_at | 查看对象操作时间线 |
+| idx_asset_operation_asset | asset_id, created_at | 查看资产完整操作记录 |
 
 #### asset_evidence：资产证据链表
 
@@ -601,6 +704,7 @@ erDiagram
 | id | uuid | 是 | 唯一标识 |
 | candidate_id | uuid | 是 | 候选资产 ID |
 | evidence_type | varchar(32) | 是 | 证据类型 |
+| ref_type | varchar(32) | 是 | 来源对象类型：`task_trace`、`usage_record`、`file`、`manual_note` |
 | ref_id | varchar(128) | 否 | 来源对象 ID |
 | excerpt | text | 否 | 证据摘录 |
 | feedback_result | varchar(32) | 否 | 采纳、调整、驳回等 |
@@ -641,6 +745,8 @@ erDiagram
 | --- | --- | --- | --- |
 | id | uuid | 是 | 任务轨迹 ID |
 | task_code | varchar(64) | 是 | 任务编号 |
+| session_id | varchar(128) | 否 | 对话会话 ID |
+| parent_task_id | uuid | 否 | 父任务 ID，用于追踪子任务或子 Agent 执行 |
 | agent_id | varchar(128) | 是 | Agent ID |
 | task_type | varchar(64) | 是 | 任务类型，例如插单评估、故障重排 |
 | user_id | uuid | 否 | 触发用户 |
@@ -649,6 +755,7 @@ erDiagram
 | output_summary | text | 否 | 输出摘要 |
 | result_status | varchar(32) | 是 | 任务结果 |
 | business_result_json | jsonb | 否 | 业务执行结果 |
+| trace_url | text | 否 | 外部可观测平台或任务详情链接 |
 | started_at | timestamptz | 是 | 开始时间 |
 | finished_at | timestamptz | 否 | 结束时间 |
 
@@ -672,12 +779,31 @@ erDiagram
 }
 ```
 
+#### asset_retrieval_record：资产检索记录表
+
+记录 Agent 在某次任务中检索到的资产，以及最终是否被选用。
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| id | uuid | 是 | 检索记录 ID |
+| task_trace_id | uuid | 是 | Agent 任务轨迹 ID |
+| asset_id | uuid | 是 | 资产 ID |
+| asset_version_id | uuid | 是 | 检索到的资产版本 |
+| query_text | text | 否 | 检索查询文本 |
+| rank_no | int | 是 | 检索排序 |
+| retrieval_score | numeric(8,4) | 否 | 检索相关度 |
+| retrieval_status | varchar(32) | 是 | `retrieved`、`selected`、`discarded` |
+| discard_reason | text | 否 | 未选用原因 |
+| matched_reason | text | 否 | 命中原因 |
+| created_at | timestamptz | 是 | 创建时间 |
+
 #### asset_usage_record：资产使用记录表
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | id | uuid | 是 | 使用记录 ID |
 | task_trace_id | uuid | 是 | Agent 任务轨迹 ID |
+| retrieval_record_id | uuid | 否 | 对应检索记录；人工指定资产时可为空 |
 | asset_id | uuid | 是 | 资产 ID |
 | asset_version_id | uuid | 是 | 使用的资产版本 |
 | usage_role | varchar(32) | 是 | 使用方式 |
@@ -696,6 +822,9 @@ erDiagram
 | task_trace_id | uuid | 是 | 任务轨迹 ID |
 | tool_asset_id | uuid | 是 | 工具资产 ID |
 | tool_asset_version_id | uuid | 是 | 工具资产版本 |
+| policy_check_id | uuid | 否 | 调用前治理校验记录 ID |
+| approval_instance_id | uuid | 否 | 高风险调用对应审批实例 ID |
+| idempotency_key | varchar(128) | 否 | 幂等键，避免重复写回或重复申请 |
 | call_name | varchar(128) | 是 | 调用名称 |
 | input_json | jsonb | 是 | 入参，敏感字段脱敏 |
 | output_json | jsonb | 否 | 出参，敏感字段脱敏 |
@@ -719,6 +848,8 @@ erDiagram
 | risk_level | varchar(16) | 是 | 识别出的风险等级 |
 | decision_reason | text | 否 | 校验原因 |
 | required_approval_roles | jsonb | 否 | 需要审批的角色 |
+| approval_instance_id | uuid | 否 | 已创建或关联的审批实例 ID |
+| next_action | varchar(64) | 否 | 下一步动作，例如 `submit_approval`、`block`、`continue` |
 | blocked_rules | jsonb | 否 | 命中的禁止规则 |
 | created_at | timestamptz | 是 | 创建时间 |
 
@@ -726,32 +857,53 @@ erDiagram
 
 ```json
 {
+  "policy_check_id": "policy-check-uuid",
   "allowed": false,
   "risk_level": "high",
   "decision_reason": "跨车间调拨会影响已锁定计划，必须经过计划主管和生产经理审批。",
   "required_approval_roles": ["plan_supervisor", "production_manager"],
+  "approval_instance_id": null,
   "next_action": "create_plan_change_request"
 }
 ```
 
 ### 4.8 验证与审批表
 
-#### asset_validation_result：资产验证结果表
+#### validation_run：资产验证任务表
+
+承载一次完整验证任务，验证对象可以是资产版本或候选资产。
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| id | uuid | 是 | 验证任务 ID |
+| object_type | varchar(32) | 是 | `asset_version`、`candidate` |
+| object_id | uuid | 是 | 验证对象 ID |
+| asset_id | uuid | 否 | 资产 ID，候选资产验证时为空 |
+| candidate_id | uuid | 否 | 候选资产 ID，正式资产版本验证时为空 |
+| status | varchar(32) | 是 | 验证状态 |
+| overall_score | numeric(5,2) | 否 | 总体得分 |
+| result_summary | text | 否 | 总体验证摘要 |
+| created_by | uuid | 否 | 发起人 |
+| started_at | timestamptz | 是 | 开始时间 |
+| finished_at | timestamptz | 否 | 结束时间 |
+
+约束说明：
+
+- `object_type + object_id` 为多态引用，不做数据库外键，由业务服务校验对象存在性。
+- 当 `object_type = asset_version` 时，必须填写 `asset_id`；当 `object_type = candidate` 时，必须填写 `candidate_id`。
+
+#### asset_validation_result：资产验证结果明细表
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | id | uuid | 是 | 验证结果 ID |
-| asset_id | uuid | 否 | 资产 ID |
-| asset_version_id | uuid | 否 | 资产版本 ID |
-| candidate_id | uuid | 否 | 候选资产 ID |
+| validation_run_id | uuid | 是 | 验证任务 ID |
 | validation_type | varchar(64) | 是 | `schema_check`、`scope_check`、`conflict_check`、`replay_test`、`permission_check` |
 | status | varchar(32) | 是 | 验证状态 |
 | score | numeric(5,2) | 否 | 验证得分 |
 | result_summary | text | 否 | 验证摘要 |
 | detail_json | jsonb | 否 | 验证详情 |
-| started_at | timestamptz | 是 | 开始时间 |
-| finished_at | timestamptz | 否 | 结束时间 |
-| created_by | uuid | 否 | 发起人 |
+| created_at | timestamptz | 是 | 创建时间 |
 
 #### approval_instance：审批实例表
 
@@ -767,6 +919,13 @@ erDiagram
 | completed_at | timestamptz | 否 | 完成时间 |
 | current_step | int | 否 | 当前审批步骤 |
 | reason | text | 否 | 提交原因 |
+
+约束与索引说明：
+
+- `object_type + object_id` 为多态引用，不做数据库外键。
+- 业务服务必须在创建审批前校验对象存在、对象状态允许发起该审批、审批类型与对象类型匹配。
+- 必须创建索引 `idx_approval_object(object_type, object_id)`，用于按对象查询审批记录。
+- 建议创建索引 `idx_approval_status(status, submitted_at)`，用于待审批列表。
 
 #### approval_step：审批步骤表
 
@@ -794,8 +953,8 @@ erDiagram
 | stat_date | date | 是 | 统计日期 |
 | asset_id | uuid | 是 | 资产 ID |
 | asset_type | varchar(32) | 是 | 资产类型 |
-| scenario | varchar(64) | 否 | 业务场景 |
-| factory_code | varchar(64) | 否 | 工厂 |
+| scenario | varchar(64) | 是 | 业务场景；无具体场景时写 `ALL` |
+| factory_code | varchar(64) | 是 | 工厂；跨工厂或不限工厂时写 `ALL` |
 | usage_count | int | 是 | 引用次数 |
 | accepted_count | int | 是 | 采纳次数 |
 | adjusted_count | int | 是 | 调整次数 |
@@ -810,6 +969,8 @@ erDiagram
 | 约束 | 字段 |
 | --- | --- |
 | uk_asset_metric_daily | stat_date, asset_id, scenario, factory_code |
+
+说明：`scenario` 和 `factory_code` 不使用 `NULL` 参与唯一约束，避免 PostgreSQL 中 `NULL` 不相等导致重复汇总行。
 
 ### 4.10 前端页面数据结构
 
@@ -945,15 +1106,19 @@ erDiagram
 
 ```json
 {
+  "search_trace_id": "search-trace-uuid",
   "items": [
     {
+      "retrieval_record_id": "retrieval-record-uuid",
       "asset_id": "asset-uuid",
       "asset_version_id": "version-uuid",
       "asset_code": "AST-WF-202606-0003",
       "name": "设备故障后局部重排工作流",
       "asset_type": "workflow",
       "usage_role": "context",
+      "rank_no": 1,
       "score": 0.9132,
+      "retrieval_status": "retrieved",
       "matched_reason": "任务场景、产线范围和故障时长均匹配"
     }
   ]
@@ -996,10 +1161,12 @@ erDiagram
 
 ```json
 {
+  "policy_check_id": "policy-check-uuid",
   "allowed": false,
   "risk_level": "high",
   "reason": "计划写回属于高风险动作，需要计划主管审批。",
   "required_approval_roles": ["plan_supervisor"],
+  "approval_instance_id": null,
   "next_action": "submit_approval"
 }
 ```
@@ -1013,6 +1180,7 @@ erDiagram
   "task_trace_id": "task-uuid",
   "records": [
     {
+      "retrieval_record_id": "retrieval-record-uuid",
       "asset_id": "asset-uuid",
       "asset_version_id": "version-uuid",
       "usage_role": "policy",
@@ -1046,6 +1214,7 @@ erDiagram
   "evidence_refs": [
     {
       "evidence_type": "task_trace",
+      "ref_type": "task_trace",
       "ref_id": "TASK-20260618-0007"
     }
   ]
