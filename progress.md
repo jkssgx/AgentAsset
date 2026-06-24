@@ -36,11 +36,13 @@
 - 新增 `governance_policy` 和 `policy_check_hit` 设计，明确治理策略与资产/资产版本的可选关联关系，并将 `policy_check_record` 定位为一次治理校验结果记录。
 - 细化 `SDD.md` 中 `4.10 前端页面数据结构`，按资产工作台、资产台账、资产详情、新建编辑、候选资产池、验证审批、Agent 使用记录、价值分析和治理配置页面补充页面级数据结构。
 - 根据 `SDD.md` 中的功能模块与页面数据结构，生成 9 张页面原型图片并沉淀到 `prototype/2026-06-23`，覆盖资产工作台、资产台账、资产详情、新建编辑、候选资产池、验证审批、Agent 使用记录、价值分析和治理配置。
+- 补充智能体辅助新增资产的产品边界、流程和架构定位，明确 Hermes、DeerFlow 等 Harness 可作为可替换的编排执行层，但正式资产库仍以资产管理系统为权威来源，正式发布必须经过人工确认、验证和审批。
 
 ## 后续规划
 
 - 根据评审反馈确定主视觉方向、信息密度和页面结构。
 - 基于 `SDD.md` 中已补充的数据结构，继续推导接口清单、页面字段映射和后端模块划分。
+- 进一步评估 Hermes、DeerFlow 等 Harness 的接入条件，包括 human-in-the-loop、结构化输出、运行轨迹、工具权限控制、可观测性和部署方式。
 - 基于当前 `prototype/index.html`，规划并搭建 `frontend/` 前端工程骨架，将静态原型迁移为 React + Ant Design 可交互页面。
 - 继续细化 `architecture.md` 中的资产对象模型、业务 Skill 资产模型、Agent 任务上下文模型、权限模型、候选资产验证机制、DeepAgents 适配实现和首期技术栈边界。
 
@@ -51,6 +53,7 @@
 - 需要进一步定义资产状态流转、审批权限、Agent 可用权限分级和价值度量口径。
 - 需要确认 DeepAgents 首期接入形态：工具调用为主，还是同时使用文件系统上下文承载资产包。
 - 需要确认 Agent 自主沉淀候选资产的触发规则、证据要求和人工审批角色。
+- 需要确认首期资产新增辅助优先接入 Hermes、DeerFlow 还是 DeepAgents/LangGraph 等其他 Harness，以及是否需要先做 Harness Adapter 抽象层。
 - 需要确认首期工程部署策略：单体后端内模块化实现，还是直接拆分为 Agent Runtime Service 与 Asset Management Service。
 - 需要确认哪些资产类型可以发布为业务 Skill，哪些只作为 Skill 运行时引用的支撑资产。
 - 需要确认 Skill Projection Service 的实现方式：任务开始时动态投影、Agent 启动时预投影，还是按版本变更增量同步。

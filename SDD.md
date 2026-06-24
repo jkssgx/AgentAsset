@@ -58,7 +58,63 @@ sequenceDiagram
     C->>R: 审批通过后发布为正式资产
 ```
 
-### 1.3 人工创建资产
+### 1.3 智能体辅助新增资产
+
+资产新增支持由智能体辅助完成，但智能体只负责起草、结构化、补全、预校验和生成说明，不能绕过人工确认、验证、审批直接发布正式资产。
+
+```mermaid
+sequenceDiagram
+    participant U as 业务用户
+    participant P as 新建资产页面
+    participant S as 资产新增辅助服务
+    participant H as Harness Adapter
+    participant A as Hermes/DeerFlow/其他Harness
+    participant C as 候选资产池
+    participant V as 验证服务
+    participant E as 业务专家/审批人
+    participant R as 正式资产库
+
+    U->>P: 输入自然语言/上传材料/选择任务轨迹
+    P->>S: 请求智能体辅助新增
+    S->>H: 创建资产分析任务
+    H->>A: 编排识别、结构化、补全、相似检查
+    A-->>H: 返回结构化建议和证据摘要
+    H-->>S: 返回 proposed_content_json、证据、风险提示
+    S->>C: 生成或更新 asset_candidate
+    C-->>P: 展示候选内容、证据、相似资产和预检查结果
+    U->>P: 人工确认转为草稿
+    P->>R: 创建 asset + asset_version(draft)
+    R->>V: 发起验证
+    V-->>E: 验证结果进入审批
+    E->>R: 审批通过后发布正式版本
+```
+
+推荐闭环：
+
+```text
+自然语言描述 / 上传材料 / 运行日志 / SOP / 历史任务 / 人工反馈
+  -> 智能体辅助识别候选资产
+  -> 生成 asset_candidate
+  -> 补充 candidate_evidence
+  -> 生成 proposed_content_json / content_text / content_schema 建议
+  -> 相似资产检查
+  -> 治理策略预检查
+  -> 人工确认转为资产草稿
+  -> 生成 asset + asset_version(draft)
+  -> 验证
+  -> 审批
+  -> 发布正式版本
+```
+
+边界要求：
+
+- 智能体可以辅助生成候选资产或正式资产草稿，但不能直接发布正式资产。
+- 智能体可以推荐适用范围、风险等级和权限边界，但扩大范围、授予工具执行权限必须由人工确认。
+- 智能体可以生成审批说明和风险提示，但高风险规则、工具、工作流的最终业务责任归人工审批人。
+- Harness 只作为任务编排和智能体执行层，不能成为资产库的权威来源。
+- 资产系统必须记录 Harness 运行轨迹、输入输出摘要、工具调用、证据来源和人工确认动作。
+
+### 1.4 人工创建资产
 
 ```text
 新建资产
@@ -73,7 +129,7 @@ sequenceDiagram
   -> 审批通过后发布
 ```
 
-### 1.4 资产版本更新
+### 1.5 资产版本更新
 
 ```text
 已发布资产
@@ -86,7 +142,7 @@ sequenceDiagram
   -> 旧版本归档，可按权限回滚
 ```
 
-### 1.5 审批退回后重新提交
+### 1.6 审批退回后重新提交
 
 ```text
 待审批资产版本
@@ -98,7 +154,7 @@ sequenceDiagram
   -> 验证通过后重新提交审批
 ```
 
-### 1.6 候选资产合并到已有资产
+### 1.7 候选资产合并到已有资产
 
 ```text
 候选资产
@@ -111,7 +167,7 @@ sequenceDiagram
   -> 审批通过后候选状态变为 converted
 ```
 
-### 1.7 资产停用后的 Agent 缓存失效
+### 1.8 资产停用后的 Agent 缓存失效
 
 ```text
 资产停用或废止
@@ -1395,10 +1451,32 @@ Python 脚本工具配置示例：
 
 用于资产创建向导和版本编辑。`content_schema` 用于动态渲染不同资产类型的表单。
 
+该页面支持两种创建方式：人工逐步填写，以及智能体辅助新增。智能体辅助新增时，页面需要展示 Harness 运行状态、结构化建议、相似资产、证据摘要、风险提示和治理预检查结果。用户确认后，候选内容才能转为正式资产草稿。
+
 ```json
 {
   "mode": "create",
   "step": "governance_config",
+  "creation_mode": "ai_assisted",
+  "assistant_request": {
+    "input_type": "natural_language",
+    "input_text": "根据最近三次低压线路过载处置记录，沉淀一条可复用的处置规则。",
+    "source_refs": [
+      {
+        "ref_type": "task_trace",
+        "ref_id": "TASK-20260618-0007"
+      }
+    ],
+    "preferred_harness": "deerflow"
+  },
+  "harness_run": {
+    "run_id": "harness-run-uuid",
+    "harness_type": "deerflow",
+    "status": "completed",
+    "started_at": "2026-06-22T09:20:00+08:00",
+    "completed_at": "2026-06-22T09:21:12+08:00",
+    "trace_summary": "完成候选识别、字段结构化、相似资产检查和治理预检查"
+  },
   "draft": {
     "asset_id": null,
     "asset_version_id": null,
@@ -1450,14 +1528,42 @@ Python 脚本工具配置示例：
   "ai_structure_result": {
     "status": "generated",
     "confidence_score": 82.3,
+    "suggested_asset_type": "rule",
+    "suggested_tags": ["急单", "优先级", "插单"],
+    "suggested_scope": {
+      "scope_type": "factory",
+      "scope_code": "SZ01",
+      "include_children": true
+    },
     "warnings": ["未检测到明确的有效期"]
+  },
+  "similar_assets": [
+    {
+      "asset_id": "asset-uuid",
+      "asset_name": "急单插入优先级规则",
+      "similarity_score": 0.87,
+      "suggested_action": "create_new_version"
+    }
+  ],
+  "candidate_preview": {
+    "candidate_id": "candidate-uuid",
+    "status": "new",
+    "proposed_content_json": {
+      "rule_category": "priority",
+      "trigger_condition": {
+        "customer_level": "S",
+        "delay_hours": { "gte": 8 }
+      }
+    },
+    "evidence_count": 3
   },
   "validation_preview": {
     "schema_check": "passed",
     "scope_check": "warning",
-    "conflict_check": "not_started"
+    "conflict_check": "not_started",
+    "policy_check": "requires_approval"
   },
-  "available_actions": ["save_draft", "run_validation", "submit_approval"]
+  "available_actions": ["save_draft", "run_assistant", "accept_ai_suggestion", "convert_candidate_to_draft", "run_validation", "submit_approval"]
 }
 ```
 

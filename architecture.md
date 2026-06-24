@@ -16,19 +16,19 @@
 
 ### 2.1 Agent 框架无关
 
-资产管理模块不直接依赖 `deepagents`、LangGraph、AutoGen、CrewAI 或其他具体 Agent 框架。
+资产管理模块不直接依赖 `deepagents`、LangGraph、AutoGen、CrewAI、Hermes、DeerFlow 或其他具体 Agent 框架 / Harness。
 
 系统应采用如下结构：
 
 ```text
-Agent 框架
+Agent 框架 / Harness
   -> Agent Asset Adapter
   -> Asset Gateway
   -> 资产检索 / 资产详情 / 工具调用 / 治理校验 / 使用记录 / 候选沉淀
   -> 资产库与候选资产池
 ```
 
-近期可以基于 `langchain-ai/deepagents` 落地，但 `deepagents` 只应位于 Agent 框架适配层，不能反向决定资产对象模型、治理流程和沉淀机制。
+近期可以基于 `langchain-ai/deepagents`、Hermes、DeerFlow 或其他 Harness 落地，但它们只应位于 Agent 框架适配层，不能反向决定资产对象模型、治理流程和沉淀机制。
 
 ### 2.2 服务职责独立，部署形态渐进
 
@@ -100,11 +100,36 @@ Agent 在任务中使用了哪些资产、为何使用、如何影响决策、�
 
 资产模块不仅要告诉 Agent “可以用什么”，也要告诉 Agent “哪些动作不能直接做，哪些动作必须审批”。
 
+### 2.6 Harness 可替换
+
+资产新增辅助可以引入 Hermes、DeerFlow、DeepAgents、LangGraph、AutoGen、CrewAI、Dify 或自研 Harness 完成任务编排，但 Harness 只负责“如何执行智能体辅助流程”，不负责定义正式资产的权威模型。
+
+推荐定位：
+
+```text
+资产管理系统 = Source of Truth
+Harness = Agent 执行与流程编排
+智能体 = 资产识别、结构化、校验、补全、解释助手
+人工 = 业务确认、风险责任、最终发布
+```
+
+Harness 准入能力建议：
+
+- 支持多步骤任务编排。
+- 支持工具调用和权限边界控制。
+- 支持 human-in-the-loop 人工确认节点。
+- 支持结构化 JSON 输出和 Schema 约束。
+- 支持运行轨迹、输入输出、工具调用和异常记录。
+- 支持与 Asset Gateway、审批服务和验证服务集成。
+- 支持模型、工具和流程的可替换配置。
+
+资产系统应通过 `Harness Adapter` 接入具体 Harness，避免把 Hermes、DeerFlow 或其他框架的流程 DSL、状态模型、工具定义直接渗透到资产核心模型中。
+
 ## 3. 总体架构
 
 ```mermaid
 flowchart LR
-  A["Agent 框架<br/>DeepAgents / LangGraph / AutoGen / 自研"] --> B["Agent Asset Adapter<br/>框架适配层"]
+  A["Agent 框架 / Harness<br/>DeepAgents / Hermes / DeerFlow / LangGraph / 自研"] --> B["Agent Asset Adapter<br/>框架适配层"]
   B --> C["Asset Gateway<br/>资产服务网关"]
   C --> D["资产检索服务"]
   C --> E["资产详情服务"]
@@ -121,6 +146,18 @@ flowchart LR
   L --> M["验证 / 审批 / 发布"]
   M --> J
 ```
+
+引入资产新增辅助后，建议新增独立的辅助服务层：
+
+```text
+前端新增资产页面
+  -> Asset Management API
+  -> Asset Creation Assistant Service
+  -> Harness Adapter
+  -> Hermes / DeerFlow / DeepAgents / LangGraph / 其他 Harness
+```
+
+`Asset Creation Assistant Service` 负责把资产新增场景抽象成稳定的业务能力，例如候选生成、字段补全、结构化、证据提取、相似资产检查和治理预检查；`Harness Adapter` 负责把这些能力映射到具体 Harness 的任务、Agent、工具、流程或节点。
 
 ## 4. Agent 与资产模块的交互方式
 
@@ -271,6 +308,47 @@ propose_asset_candidate(candidate)
 ```text
 退回修改 / 冲突待解 / 停用 / 废止
 ```
+
+### 4.3 Agent 辅助新增资产
+
+资产新增可以由智能体辅助完成，但不建议让智能体直接创建并发布正式资产。更合理的边界是：智能体负责起草、结构化、补全和预校验，人负责业务确认和发布责任，资产系统负责版本、权限、审批、审计和状态流转。
+
+推荐流程：
+
+```text
+自然语言描述 / 上传材料 / 运行日志 / SOP / 历史任务 / 人工反馈
+  -> Asset Creation Assistant Service
+  -> Harness Adapter 编排智能体分析
+  -> 生成 asset_candidate
+  -> 补充 candidate_evidence
+  -> 生成 proposed_content_json / content_text / content_schema 建议
+  -> 相似资产检查
+  -> 治理策略预检查
+  -> 人工确认转为资产草稿
+  -> 生成 asset + asset_version(draft)
+  -> 验证
+  -> 审批
+  -> 发布正式版本
+```
+
+智能体适合承担：
+
+- 从自然语言、运行日志、SOP、历史任务、告警记录中提取候选资产。
+- 辅助填写资产名称、摘要、类型、标签、适用范围、风险等级。
+- 将非结构化内容整理为结构化字段，例如规则条件、工具输入输出、工作流步骤、知识片段。
+- 识别相似资产，提示重复、合并或基于已有资产创建新版本。
+- 生成初版 `content_text`、`content_json`、`content_schema` 建议。
+- 执行字段完整性、Schema、范围合法性、权限可见性、命名规范和治理策略预检查。
+- 生成提交审批说明，解释新增资产的依据、证据和风险。
+
+智能体不应承担：
+
+- 直接发布正式资产。
+- 直接修改正式资产的生效版本。
+- 直接扩大资产适用范围。
+- 直接授予工具执行权限。
+- 对高风险规则、工具、工作流做最终业务确认。
+- 绕过审批、验证和审计。
 
 ## 5. 标准 Agent 资产接口
 
