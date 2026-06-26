@@ -60,6 +60,12 @@
 - 2026-06-26 调整 Agent 使用记录中的资产引用记录页面原型，将页面从资产流水视角改为任务主线视角，突出单个任务执行过程中引用了哪些资产、为什么引用以及对任务结果产生的影响；原资产流水版本备份为 `prototype/2026-06-24/13-agent-asset-usage-records-asset-centric-v1.png`。
 - 2026-06-26 依据任务轨迹详情结构再次调整资产引用记录页面原型，采用顶部任务基本信息、中部任务节点流程图、底部节点记录明细的布局，底部默认展示当前节点的资产引用记录、引用解释与产生效果；任务主线版本备份为 `prototype/2026-06-24/13-agent-asset-usage-records-taskline-v2.png`。
 - 2026-06-26 生成任务轨迹详情中的工具调用记录、治理校验记录和人工反馈记录三个页签状态页面原型图，统一沿用任务基本信息、任务节点轨迹和节点记录明细结构，图片分别沉淀到 `prototype/2026-06-24/14-agent-tool-call-records.png`、`prototype/2026-06-24/15-agent-governance-check-records.png`、`prototype/2026-06-24/16-agent-human-feedback-records.png`。
+- 2026-06-26 生成价值分析页面原型图，展示资产引用次数、引用后采纳率、覆盖任务数、人工修正率、治理拦截、候选转正率、引用采纳趋势、资产类型贡献、业务场景贡献、高价值资产排行、待优化资产和资产飞轮健康度，图片沉淀到 `prototype/2026-06-24/17-value-analytics.png`。
+- 2026-06-26 调整价值分析页面原型图顶部结构，将原页面标题区改为历史打开菜单 Tab，当前激活“价值分析”，原标题区版本备份为 `prototype/2026-06-24/17-value-analytics-title-v1.png`。
+- 2026-06-26 生成治理配置中的权限配置页面原型图，展示主体权限配置、组织生效范围、资产使用权限矩阵、工具动作与写回边界、权限详情、风险预览、关联治理策略和异常待处理，图片沉淀到 `prototype/2026-06-24/18-governance-permission-config.png`。
+- 2026-06-26 将治理配置模块调整为左侧独立子菜单结构，包含权限配置、范围字典、审批策略、治理策略和审计规则，并同步更新 `SDD.md` 的页面信息架构说明。
+- 2026-06-26 重新生成治理配置中的权限配置页面原型图，改为左侧治理配置子菜单高亮形态；原横向 Tab 版本备份为 `prototype/2026-06-24/18-governance-permission-config-tab-v1.png`。
+- 2026-06-26 生成治理配置中的范围字典、审批策略、治理策略和审计规则页面原型图，分别沉淀到 `prototype/2026-06-24/19-governance-scope-dictionary.png`、`prototype/2026-06-24/20-governance-approval-policy.png`、`prototype/2026-06-24/21-governance-policy-config.png`、`prototype/2026-06-24/22-governance-audit-rules.png`。
 
 ## 后续规划
 
