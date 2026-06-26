@@ -195,9 +195,11 @@ sequenceDiagram
 │  ├─ 待审批
 │  └─ 审批记录
 ├─ Agent 使用记录
-│  ├─ 任务引用记录
+│  ├─ 任务轨迹总览
+│  ├─ 资产引用记录
 │  ├─ 工具调用记录
-│  └─ 治理校验记录
+│  ├─ 治理校验记录
+│  └─ 人工反馈记录
 ├─ 价值分析
 └─ 治理配置
    ├─ 权限配置
@@ -1675,15 +1677,26 @@ Python 脚本工具配置示例：
 
 #### Agent 使用记录页面
 
-用于展示任务轨迹、资产检索、资产引用、治理校验和工具调用。
+用于展示任务轨迹、资产检索、资产引用、治理校验、工具调用和人工反馈。页面应同时满足业务人员复盘“Agent 为什么这么建议、是否可信、人工如何处理”的诉求，以及 IT/系统管理员排查“工具是否调用成功、是否越权、治理策略是否命中、审批是否触发”的诉求。
+
+建议拆分为以下子页面：
+
+- 任务轨迹总览：以调度任务为入口，聚合任务上下文、资产引用、工具调用、治理校验、建议结果和人工反馈。
+- 资产引用记录：以资产使用为入口，展示检索、选用、丢弃、引用原因和对方案的影响。
+- 工具调用记录：以工具调用为入口，展示调用状态、耗时、错误、入参/出参摘要、审批和幂等信息。
+- 治理校验记录：以治理校验为入口，展示动作类型、是否允许、命中策略、风险等级、审批要求和下一步动作。
+- 人工反馈记录：以用户反馈为入口，展示采纳、调整、驳回、人工修改内容和反馈原因；首期可作为任务轨迹总览的详情区块实现。
 
 ```json
 {
+  "active_tab": "task_trace_overview",
   "filters": {
     "task_type": "device_failure_reschedule",
     "agent_id": "dispatch-agent",
     "asset_type": "workflow",
     "result_status": "accepted",
+    "feedback_result": "adjusted",
+    "risk_level": "high",
     "time_range": ["2026-06-01", "2026-06-22"]
   },
   "task_rows": [
@@ -1693,10 +1706,13 @@ Python 脚本工具配置示例：
       "task_type": "device_failure_reschedule",
       "agent_id": "dispatch-agent",
       "user_name": "李计划",
+      "factory": "SZ01",
+      "line": "LINE-A1",
       "result_status": "accepted",
       "asset_usage_count": 6,
       "tool_call_count": 3,
       "policy_check_count": 2,
+      "feedback_count": 1,
       "started_at": "2026-06-18T08:30:00+08:00"
     }
   ],
@@ -1721,6 +1737,7 @@ Python 脚本工具配置示例：
         "asset_id": "asset-uuid",
         "usage_role": "context",
         "used_in_step": "方案生成",
+        "reason": "该工作流适用于关键设备短时故障后的局部重排判断",
         "influence_summary": "确定先局部重排再判断是否全局重排"
       }
     ],
@@ -1730,6 +1747,8 @@ Python 脚本工具配置示例：
         "action_type": "plan_writeback",
         "allowed": false,
         "risk_level": "high",
+        "matched_policy_count": 2,
+        "decision_reason": "计划写回和跨车间调拨均需要人工审批",
         "next_action": "submit_approval"
       }
     ],
@@ -1738,8 +1757,28 @@ Python 脚本工具配置示例：
         "tool_call_id": "tool-call-uuid",
         "call_name": "run_reschedule_solver",
         "status": "success",
-        "latency_ms": 1280
+        "latency_ms": 1280,
+        "approval_instance_id": null,
+        "error_code": null
       }
+    ],
+    "feedback_records": [
+      {
+        "feedback_id": "feedback-uuid",
+        "feedback_result": "adjusted",
+        "user_name": "李计划",
+        "feedback_reason": "保留瓶颈工序前两单不调整，避免换型损失扩大",
+        "manual_change_summary": "调整了两张订单的插入顺序",
+        "business_result": "方案执行后延期小时下降 12%",
+        "created_at": "2026-06-18T09:12:00+08:00"
+      }
+    ],
+    "timeline": [
+      { "step_no": 1, "event_type": "asset_retrieval", "title": "检索相关资产", "status": "completed" },
+      { "step_no": 2, "event_type": "asset_usage", "title": "引用设备故障重排工作流", "status": "completed" },
+      { "step_no": 3, "event_type": "tool_call", "title": "调用 APS 局部重排求解器", "status": "success" },
+      { "step_no": 4, "event_type": "policy_check", "title": "计划写回治理校验", "status": "blocked" },
+      { "step_no": 5, "event_type": "human_feedback", "title": "计划员调整并采纳", "status": "completed" }
     ]
   }
 }
