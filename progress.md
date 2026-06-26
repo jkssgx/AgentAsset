@@ -66,6 +66,7 @@
 - 2026-06-26 将治理配置模块调整为左侧独立子菜单结构，包含权限配置、范围字典、审批策略、治理策略和审计规则，并同步更新 `SDD.md` 的页面信息架构说明。
 - 2026-06-26 重新生成治理配置中的权限配置页面原型图，改为左侧治理配置子菜单高亮形态；原横向 Tab 版本备份为 `prototype/2026-06-24/18-governance-permission-config-tab-v1.png`。
 - 2026-06-26 生成治理配置中的范围字典、审批策略、治理策略和审计规则页面原型图，分别沉淀到 `prototype/2026-06-24/19-governance-scope-dictionary.png`、`prototype/2026-06-24/20-governance-approval-policy.png`、`prototype/2026-06-24/21-governance-policy-config.png`、`prototype/2026-06-24/22-governance-audit-rules.png`。
+- 2026-06-26 按 `AGENTS.md` 文档归属要求新增 `PP.md` 项目计划文档，沉淀首期 MVP 建设目标、范围边界、阶段计划、里程碑、交付物、验收计划、风险应对和待确认事项。
 
 ## 后续规划
 
