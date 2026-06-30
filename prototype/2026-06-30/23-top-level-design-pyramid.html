@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent资产管理系统顶层设计金字塔</title>
+  <style>
+    :root {
+      --navy: #10243f;
+      --navy-2: #17365d;
+      --teal: #13a8a8;
+      --blue: #2f7de1;
+      --cyan: #e8fbfd;
+      --line: #cdd9e7;
+      --text: #1f2f43;
+      --muted: #66768a;
+      --orange: #f59e0b;
+      --red: #d71920;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #eef3f8;
+      font-family: "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      color: var(--text);
+    }
+
+    .canvas {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(237, 245, 251, 0.98)),
+        radial-gradient(circle at 16% 12%, rgba(19, 168, 168, 0.12), transparent 34%),
+        radial-gradient(circle at 84% 82%, rgba(47, 125, 225, 0.12), transparent 36%);
+    }
+
+    .topbar {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 92px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 72px;
+      background: #ffffff;
+      border-bottom: 1px solid #d9e3ee;
+      box-shadow: 0 10px 28px rgba(16, 36, 63, 0.08);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      background: var(--red);
+      position: relative;
+      box-shadow: 0 10px 20px rgba(215, 25, 32, 0.18);
+    }
+
+    .brand-mark::after {
+      content: "";
+      position: absolute;
+      inset: 10px;
+      border: 4px solid #ffffff;
+      border-left-color: transparent;
+      border-radius: 50%;
+      transform: rotate(-28deg);
+    }
+
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .brand-text strong {
+      font-size: 28px;
+      line-height: 1;
+      color: #132f4c;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .brand-text span {
+      font-size: 15px;
+      color: #6d7b8d;
+    }
+
+    .tag {
+      padding: 10px 18px;
+      border: 1px solid rgba(19, 168, 168, 0.24);
+      border-radius: 6px;
+      background: rgba(232, 251, 253, 0.82);
+      color: #087b86;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .title {
+      position: absolute;
+      top: 128px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+    }
+
+    .title h1 {
+      margin: 0;
+      font-size: 48px;
+      line-height: 1.14;
+      color: #122a45;
+      font-weight: 760;
+      letter-spacing: 0;
+    }
+
+    .title p {
+      margin: 14px 0 0;
+      font-size: 22px;
+      color: #65758a;
+    }
+
+    .stage {
+      position: absolute;
+      left: 260px;
+      right: 260px;
+      top: 230px;
+      bottom: 94px;
+    }
+
+    .pyramid {
+      position: absolute;
+      left: 270px;
+      top: 18px;
+      width: 860px;
+      height: 620px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .layer {
+      position: relative;
+      height: 108px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #ffffff;
+      filter: drop-shadow(0 14px 20px rgba(16, 36, 63, 0.14));
+    }
+
+    .layer-inner {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      padding-top: 2px;
+    }
+
+    .layer::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(255, 255, 255, 0.42);
+      clip-path: polygon(var(--cut) 0, calc(100% - var(--cut)) 0, 100% 100%, 0 100%);
+      border-radius: 4px;
+    }
+
+    .layer.l1 {
+      width: 340px;
+      height: 106px;
+    }
+
+    .layer.l1::before {
+      --cut: 50%;
+      background: linear-gradient(135deg, #0f5f82, #13a8a8);
+      clip-path: polygon(50% 0, 100% 100%, 0 100%);
+    }
+
+    .layer.l2 {
+      width: 500px;
+    }
+
+    .layer.l2::before {
+      --cut: 76px;
+      background: linear-gradient(135deg, #166f9f, #1bb3be);
+    }
+
+    .layer.l3 {
+      width: 660px;
+    }
+
+    .layer.l3::before {
+      --cut: 74px;
+      background: linear-gradient(135deg, #216fc9, #25a9d8);
+    }
+
+    .layer.l4 {
+      width: 820px;
+    }
+
+    .layer.l4::before {
+      --cut: 74px;
+      background: linear-gradient(135deg, #285aa9, #2f7de1);
+    }
+
+    .layer.l5 {
+      width: 980px;
+    }
+
+    .layer.l5::before {
+      --cut: 74px;
+      background: linear-gradient(135deg, #17365d, #285f9f);
+    }
+
+    .layer-title {
+      font-size: 25px;
+      font-weight: 760;
+      line-height: 1.18;
+    }
+
+    .layer.l1 .layer-title {
+      font-size: 24px;
+      padding-top: 17px;
+    }
+
+    .layer-desc {
+      margin-top: 7px;
+      font-size: 16px;
+      line-height: 1.28;
+      color: rgba(255, 255, 255, 0.88);
+      white-space: nowrap;
+    }
+
+    .chips {
+      margin-top: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      padding: 5px 9px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.92);
+      line-height: 1;
+    }
+
+    .side-panel {
+      position: absolute;
+      top: 84px;
+      width: 246px;
+      min-height: 520px;
+      padding: 28px 24px;
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid #d8e4ef;
+      border-radius: 8px;
+      box-shadow: 0 18px 38px rgba(16, 36, 63, 0.1);
+    }
+
+    .side-panel.left {
+      left: 0;
+    }
+
+    .side-panel.right {
+      right: 0;
+    }
+
+    .side-panel h2 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.15;
+      color: #133454;
+      font-weight: 760;
+    }
+
+    .side-panel .en {
+      margin-top: 8px;
+      font-size: 14px;
+      color: #7a8a9e;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
+    .side-panel ul {
+      list-style: none;
+      padding: 0;
+      margin: 28px 0 0;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .side-panel li {
+      position: relative;
+      padding-left: 20px;
+      font-size: 18px;
+      line-height: 1.35;
+      color: #42556b;
+    }
+
+    .side-panel li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 8px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--teal);
+    }
+
+    .right li::before {
+      background: var(--blue);
+    }
+
+    .connector {
+      position: absolute;
+      top: 340px;
+      width: 155px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #9fb3ca);
+    }
+
+    .connector.left {
+      left: 246px;
+    }
+
+    .connector.right {
+      right: 246px;
+      background: linear-gradient(90deg, #9fb3ca, transparent);
+    }
+
+    .bottom-summary {
+      position: absolute;
+      left: 160px;
+      right: 160px;
+      bottom: 0;
+      min-height: 82px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 18px;
+    }
+
+    .summary-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 18px 20px;
+      background: #ffffff;
+      border: 1px solid #d8e4ef;
+      border-radius: 8px;
+      box-shadow: 0 12px 28px rgba(16, 36, 63, 0.08);
+    }
+
+    .summary-card .num {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      background: #e8fbfd;
+      color: #07838d;
+      font-weight: 760;
+      font-size: 18px;
+      flex: 0 0 auto;
+    }
+
+    .summary-card strong {
+      display: block;
+      font-size: 20px;
+      line-height: 1.1;
+      color: #183451;
+    }
+
+    .summary-card span {
+      display: block;
+      margin-top: 6px;
+      font-size: 15px;
+      color: #6e7d8f;
+      line-height: 1.25;
+    }
+  </style>
+</head>
+<body>
+  <main class="canvas">
+    <section class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div class="brand-text">
+          <strong>Agent资产管理系统</strong>
+          <span>智能体无关的企业资产治理与能力供给平台</span>
+        </div>
+      </div>
+      <div class="tag">顶层设计 · 金字塔视图</div>
+    </section>
+
+    <section class="title">
+      <h1>从资产沉淀到智能体规模化复用的顶层设计</h1>
+      <p>以高内聚承载资产治理闭环，以低耦合适配不同智能体、模型服务、Harness 与业务系统</p>
+    </section>
+
+    <section class="stage">
+      <aside class="side-panel left">
+        <h2>高内聚</h2>
+        <div class="en">Cohesive asset domain</div>
+        <ul>
+          <li>资产生命周期统一管理</li>
+          <li>版本、权限、审批集中治理</li>
+          <li>候选沉淀与价值度量闭环</li>
+          <li>正式资产库作为权威来源</li>
+        </ul>
+      </aside>
+      <div class="connector left" aria-hidden="true"></div>
+
+      <section class="pyramid" aria-label="顶层设计金字塔">
+        <div class="layer l1">
+          <div class="layer-inner">
+            <div class="layer-title">战略价值</div>
+            <div class="layer-desc">企业智能体能力建设底座</div>
+          </div>
+        </div>
+
+        <div class="layer l2">
+          <div class="layer-inner">
+            <div class="layer-title">治理闭环</div>
+            <div class="layer-desc">可信发布、风险控制、全链路审计</div>
+            <div class="chips">
+              <span class="chip">权限</span>
+              <span class="chip">审批</span>
+              <span class="chip">版本</span>
+              <span class="chip">审计</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="layer l3">
+          <div class="layer-inner">
+            <div class="layer-title">资产能力层</div>
+            <div class="layer-desc">把分散经验沉淀为可管理、可复用、可演进的数字资产</div>
+            <div class="chips">
+              <span class="chip">提示词</span>
+              <span class="chip">规则</span>
+              <span class="chip">工作流</span>
+              <span class="chip">工具</span>
+              <span class="chip">知识</span>
+              <span class="chip">案例</span>
+              <span class="chip">指标</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="layer l4">
+          <div class="layer-inner">
+            <div class="layer-title">标准协议与适配层</div>
+            <div class="layer-desc">统一检索、读取、调用、校验、记录、候选沉淀协议</div>
+            <div class="chips">
+              <span class="chip">Asset Gateway</span>
+              <span class="chip">Agent Asset Adapter</span>
+              <span class="chip">Harness Adapter</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="layer l5">
+          <div class="layer-inner">
+            <div class="layer-title">接入生态层</div>
+            <div class="layer-desc">智能体无关，可适配不同 Agent、模型、业务系统和数据源</div>
+            <div class="chips">
+              <span class="chip">DeepAgents</span>
+              <span class="chip">Hermes</span>
+              <span class="chip">DeerFlow</span>
+              <span class="chip">LangGraph</span>
+              <span class="chip">自研Agent</span>
+              <span class="chip">ERP / MES / APS</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="connector right" aria-hidden="true"></div>
+      <aside class="side-panel right">
+        <h2>低耦合</h2>
+        <div class="en">Decoupled integration</div>
+        <ul>
+          <li>不绑定具体 Agent 框架</li>
+          <li>不让 Harness 侵入核心模型</li>
+          <li>通过标准接口连接运行层</li>
+          <li>支持多智能体持续扩展</li>
+        </ul>
+      </aside>
+
+      <section class="bottom-summary">
+        <div class="summary-card">
+          <div class="num">1</div>
+          <div>
+            <strong>统一沉淀</strong>
+            <span>提示词、工具、知识、规则、工作流和反馈证据统一进入资产体系</span>
+          </div>
+        </div>
+        <div class="summary-card">
+          <div class="num">2</div>
+          <div>
+            <strong>标准供给</strong>
+            <span>通过网关与适配层向不同智能体提供稳定资产能力</span>
+          </div>
+        </div>
+        <div class="summary-card">
+          <div class="num">3</div>
+          <div>
+            <strong>闭环进化</strong>
+            <span>使用记录、人工反馈和候选资产持续反哺资产优化</span>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>
